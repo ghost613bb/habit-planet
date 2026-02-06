@@ -1,4 +1,23 @@
-*{
+* {
   padding: 0;
   margin: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial,
+    'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+  background: #050510;
+  color: #e6e8ef;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
 }

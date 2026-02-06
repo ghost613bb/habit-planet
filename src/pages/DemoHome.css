@@ -1,0 +1,202 @@
+.root {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.progressBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  z-index: 20;
+}
+
+.progressFill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #6e8efb, #a777e3);
+  transition: width 0.5s ease;
+}
+
+.uiContainer {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.counterBox {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 15px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.dayBig {
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+}
+
+.stageBadge {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  margin-top: 5px;
+  color: #88ccff;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.5s ease;
+}
+
+.stageBadge.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.actionBtn {
+  pointer-events: auto;
+  background: linear-gradient(135deg, #6e8efb, #a777e3);
+  border: none;
+  padding: 16px 40px;
+  border-radius: 50px;
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(110, 142, 251, 0.4);
+  transition: transform 0.1s, box-shadow 0.3s;
+  outline: none;
+}
+
+.actionBtn:active {
+  transform: scale(0.95);
+}
+
+.actionBtn:hover {
+  box-shadow: 0 15px 40px rgba(110, 142, 251, 0.6);
+}
+
+.timeControl {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 220px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 12px;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.timeLabel {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.timeSlider {
+  width: 100%;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.valueControl {
+  position: absolute;
+  top: 130px; /* Moved down */
+  right: 20px;
+  width: 220px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 12px;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.valueLabel {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.valueNumber {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.valueSlider {
+  width: 100%;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.valueActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chip {
+  flex: 1;
+  border-radius: 999px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+}
+
+.chip:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 720px) {
+  .uiContainer {
+    bottom: 26px;
+  }
+
+  .actionBtn {
+    padding: 14px 28px;
+    font-size: 16px;
+  }
+
+  .timeControl {
+    top: 14px;
+    right: 12px;
+    width: 200px;
+  }
+  
+  .valueControl {
+    top: 120px;
+    right: 12px;
+    width: 200px;
+  }
+}

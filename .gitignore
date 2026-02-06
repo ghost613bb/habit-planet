@@ -1,4 +1,4 @@
-# Logs
+# 日志
 logs
 *.log
 npm-debug.log*
@@ -14,7 +14,7 @@ dist-ssr
 coverage
 *.local
 
-# Editor directories and files
+# 编辑器目录和文件
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -28,12 +28,18 @@ coverage
 
 .eslintcache
 
-# Cypress
+# Cypress 测试
 /cypress/videos/
 /cypress/screenshots/
 
-# Vitest
+# Vitest 测试
 __screenshots__/
 
-# Vite
+# Vite 构建
 *.timestamp-*-*.mjs
+
+# 忽略特定文件
+public/gemini_xq - 副本.html
+
+# 忽略 Trae AI 生成的文档
+.trae/
