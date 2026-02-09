@@ -88,14 +88,15 @@ function getSurfaceTransform(normal: any, radius: number) {
 const textureLoader = new TextureLoader()
 const exrLoader = new EXRLoader()
 
-const planetDiffMap = textureLoader.load('/textures/concrete_floor_damaged_01_diff_4k.jpg')
+const planetDiffMap = textureLoader.load('/textures/Material_50_baseColor.jpeg')
 planetDiffMap.colorSpace = SRGBColorSpace
 
 // --- 材质定义 ---
 const mats = {
-planet: new MeshStandardMaterial({
+  planet: new MeshStandardMaterial({
     map: planetDiffMap,
     roughness: 0.8,
+    // metalness: 0.1, // 增加一点金属感，让高光更明显
     normalScale: new Vector2(1.5, 1.5),
   }),
   grass: new MeshStandardMaterial({ map: createNoiseTexture('#77cc77', 20), roughness: 0.9 }),
@@ -112,12 +113,6 @@ planet: new MeshStandardMaterial({
   ring: new MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.0, side: 2 }), // DoubleSide
   blade: new MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }),
 }
-
-// 异步加载 Normal Map
-exrLoader.load('/textures/concrete_floor_damaged_01_nor_gl_4k.exr', (tex) => {
-  mats.planet.normalMap = tex
-  mats.planet.needsUpdate = true
-})
 
 // --- 物体生成函数 ---
 
@@ -410,23 +405,27 @@ export function createPlanetRenderer(input: {
   // controls.maxAzimuthAngle = Infinity
 
   // --- 初始化灯光 ---
-  refs.lights.ambient = new AmbientLight(0xffffff, 0.4) // 增加环境光基础亮度
+  // 环境光
+  refs.lights.ambient = new AmbientLight(0xffffff, 0.25) // 降低环境光，增加明暗对比
   scene.add(refs.lights.ambient)
 
-  refs.lights.sun = new DirectionalLight(0xffeeb1, 1.5) // 增加太阳光基础亮度
-  refs.lights.sun.position.set(10, 10, 0)
+  // 主光/正光 (模拟太阳)
+  refs.lights.sun = new DirectionalLight(0xFFB45D, 16) // 暖色主光，高强度
+  refs.lights.sun.position.set(-5,6,-3) // 从左上方照射
   refs.lights.sun.castShadow = true
   refs.lights.sun.shadow.mapSize.width = 2048
   refs.lights.sun.shadow.mapSize.height = 2048
   refs.lights.sun.shadow.bias = -0.0001
   scene.add(refs.lights.sun)
 
-  refs.lights.moon = new DirectionalLight(0x6688ff, 0.3)
-  refs.lights.moon.position.set(-10, -10, 0)
+  // 辅光/侧光 (模拟环境反射/星光)
+  refs.lights.moon = new DirectionalLight(0x4466cc, 0.8) // 冷色辅光，照亮暗部
+  refs.lights.moon.position.set(5, 10, 5)  // 从左侧照射
   scene.add(refs.lights.moon)
 
-  const rimLight = new DirectionalLight(0x4455ff, 0.5) // 增加边缘光亮度
-  rimLight.position.set(-5, 0, -10)
+  // 边缘光/轮廓光 (逆光)
+  const rimLight = new DirectionalLight(0x4488ff, 1.2) // 强烈的冷色轮廓光
+  rimLight.position.set(0, 5, -10) // 从正后上方照射
   scene.add(rimLight)
 
   refs.starsPoints = createStars()
