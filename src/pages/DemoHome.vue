@@ -14,31 +14,16 @@
       <PlanetCanvas
         :stages="store.stages"
         :stage-index="store.stageIndex"
-        :day-count="store.value"
-        :time-of-day="timeOfDay" />
+        :day-count="store.value" />
     </main>
-
-    <!-- 时间控制面板 (新增) -->
-    <div class="timeControl">
-      <div class="timeLabel">
-        <span>24H 模拟</span>
-        <span class="timeDisplay">{{ timeString }}</span>
-      </div>
-      <input
-        class="timeSlider"
-        type="range"
-        min="0"
-        max="24"
-        step="0.1"
-        :value="timeOfDay"
-        @input="onTimeInput" />
-    </div>
 
     <!-- 进度控制面板 (保留用于调试/演示) -->
     <div class="valueControl">
       <div class="valueLabel">
         <span>进度 (Day)</span>
-        <span class="valueNumber">{{ Math.round(store.value) }} / {{ store.maxValue }}</span>
+        <span class="valueNumber"
+          >{{ Math.round(store.value) }} / {{ store.maxValue }}</span
+        >
       </div>
       <input
         class="valueSlider"
@@ -96,23 +81,6 @@ const store = useGrowthStore()
 // 控制阶段徽章的动画显示
 const stageBadgeVisible = ref(true)
 let stageBadgeTimer: number | null = null
-
-// 24小时制的时间变量，默认中午12点
-const timeOfDay = ref(12)
-
-// 将时间数值格式化为 HH:MM 字符串
-const timeString = computed(() => {
-  const val = timeOfDay.value
-  const hours = Math.floor(val)
-  const minutes = Math.floor((val - hours) * 60)
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-})
-
-// 处理时间滑块输入
-function onTimeInput(e: Event) {
-  const target = e.target as HTMLInputElement
-  timeOfDay.value = parseFloat(target.value)
-}
 
 // 计算总进度的百分比
 const progressPercent = computed(() => {

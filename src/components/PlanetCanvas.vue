@@ -15,10 +15,9 @@ import { createPlanetRenderer } from '@/utils/planetRenderer'
 
 // 定义组件 Props
 const props = defineProps<{
-  stages: Stage[]       // 生长阶段配置数据
-  stageIndex: number    // 当前阶段索引
-  dayCount: number      // 当前天数/进度
-  timeOfDay: number     // 24小时制时间
+  stages: Stage[] // 生长阶段配置数据
+  stageIndex: number // 当前阶段索引
+  dayCount: number // 当前天数/进度
 }>()
 
 // 绑定 DOM 元素
@@ -36,14 +35,6 @@ watch(
   },
 )
 
-// 监听时间变化，通知渲染器更新光照和天体位置
-watch(
-  () => props.timeOfDay,
-  (val) => {
-    renderer?.setTimeOfDay(val)
-  },
-)
-
 // 组件挂载时初始化 3D 渲染器
 onMounted(() => {
   const hostEl = host.value
@@ -57,7 +48,6 @@ onMounted(() => {
   })
   // 初始化时同步一次数据
   renderer.setDayCount(props.dayCount)
-  renderer.setTimeOfDay(props.timeOfDay)
 })
 
 // 组件卸载时销毁渲染器，释放资源

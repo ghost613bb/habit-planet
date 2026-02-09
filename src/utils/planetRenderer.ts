@@ -27,10 +27,12 @@ import {
   Vector3,
   WebGLRenderer,
   BoxGeometry,
+  TextureLoader,
+  Vector2,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 
-// --- 类型定义 ---
 export type VegetationConfig = {
   grass: number
   flowers: number
@@ -82,9 +84,20 @@ function getSurfaceTransform(normal: any, radius: number) {
   return { pos, quaternion }
 }
 
+// --- 纹理加载 ---
+const textureLoader = new TextureLoader()
+const exrLoader = new EXRLoader()
+
+const planetDiffMap = textureLoader.load('/textures/concrete_floor_damaged_01_diff_4k.jpg')
+planetDiffMap.colorSpace = SRGBColorSpace
+
 // --- 材质定义 ---
 const mats = {
-  planet: new MeshStandardMaterial({ map: createNoiseTexture('#5D4037', 40), roughness: 0.9 }),
+planet: new MeshStandardMaterial({
+    map: planetDiffMap,
+    roughness: 0.8,
+    normalScale: new Vector2(1.5, 1.5),
+  }),
   grass: new MeshStandardMaterial({ map: createNoiseTexture('#77cc77', 20), roughness: 0.9 }),
   houseBody: new MeshStandardMaterial({ map: createNoiseTexture('#f5deb3', 10), roughness: 0.8 }),
   houseRoof: new MeshStandardMaterial({ map: createNoiseTexture('#e07a5f', 20), roughness: 0.7 }),
@@ -99,6 +112,12 @@ const mats = {
   ring: new MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.0, side: 2 }), // DoubleSide
   blade: new MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }),
 }
+
+// 异步加载 Normal Map
+exrLoader.load('/textures/concrete_floor_damaged_01_nor_gl_4k.exr', (tex) => {
+  mats.planet.normalMap = tex
+  mats.planet.needsUpdate = true
+})
 
 // --- 物体生成函数 ---
 
@@ -359,7 +378,6 @@ export function createPlanetRenderer(input: {
 
   // 内部状态
   let dayCount = 0
-  let timeOfDay = 12
 
   // --- 初始化场景 ---
   const scene = new Scene()
@@ -385,13 +403,17 @@ export function createPlanetRenderer(input: {
   controls.dampingFactor = 0.05
   controls.minDistance = 5
   controls.maxDistance = 18
-  controls.maxPolarAngle = Math.PI * 0.8
+  controls.maxPolarAngle = Math.PI / 2 // 限制只能在赤道及以上视角观察，防止翻转到南极
+  controls.minPolarAngle = Math.PI / 3 // 限制最小视角，防止完全俯视
+  controls.enablePan = false // 禁止平移，保持星球在中心
+  // controls.minAzimuthAngle = -Infinity // 允许水平无限旋转
+  // controls.maxAzimuthAngle = Infinity
 
   // --- 初始化灯光 ---
-  refs.lights.ambient = new AmbientLight(0xffffff, 0.2)
+  refs.lights.ambient = new AmbientLight(0xffffff, 0.4) // 增加环境光基础亮度
   scene.add(refs.lights.ambient)
 
-  refs.lights.sun = new DirectionalLight(0xffeeb1, 1.0)
+  refs.lights.sun = new DirectionalLight(0xffeeb1, 1.5) // 增加太阳光基础亮度
   refs.lights.sun.position.set(10, 10, 0)
   refs.lights.sun.castShadow = true
   refs.lights.sun.shadow.mapSize.width = 2048
@@ -403,7 +425,7 @@ export function createPlanetRenderer(input: {
   refs.lights.moon.position.set(-10, -10, 0)
   scene.add(refs.lights.moon)
 
-  const rimLight = new DirectionalLight(0x4455ff, 0.2)
+  const rimLight = new DirectionalLight(0x4455ff, 0.5) // 增加边缘光亮度
   rimLight.position.set(-5, 0, -10)
   scene.add(rimLight)
 
@@ -507,63 +529,6 @@ export function createPlanetRenderer(input: {
   refs.ringGlowMesh.rotation.copy(refs.ringMesh.rotation)
   planetGroup.add(refs.ringGlowMesh)
 
-  // --- 逻辑函数 ---
-
-  // 更新时间：控制太阳/月亮位置和光照颜色
-  function updateTimeOfDay(hour: number) {
-    timeOfDay = hour
-    // 计算太阳角度 (6点在0度，12点在90度)
-    const angle = (hour - 6) * (Math.PI / 12)
-    const sunRadius = 20
-
-    refs.lights.sun.position.x = -Math.cos(angle) * sunRadius
-    refs.lights.sun.position.y = Math.sin(angle) * sunRadius
-    refs.lights.sun.position.z = 10
-
-    refs.lights.moon.position.copy(refs.lights.sun.position).negate()
-
-    const sunIntensity = Math.max(0, Math.sin(angle))
-    const moonIntensity = Math.max(0, -Math.sin(angle))
-
-    const sunColor = new Color(0xffffff)
-    const horizonColor = new Color(0xffaa00)
-    const noonColor = new Color(0xffeeb1)
-
-    // 白天逻辑
-    if (sunIntensity > 0) {
-      const lerpFactor = Math.min(1, sunIntensity * 1.5)
-      sunColor.lerpColors(horizonColor, noonColor, lerpFactor)
-      refs.lights.sun.color.copy(sunColor)
-      refs.lights.sun.intensity = sunIntensity * 1.2
-      refs.lights.moon.intensity = 0
-
-      refs.lights.ambient.color.setHex(0xaaaaaa)
-      refs.lights.ambient.intensity = 0.2 + sunIntensity * 0.4
-    } else { // 夜晚逻辑
-      refs.lights.sun.intensity = 0
-      refs.lights.moon.intensity = moonIntensity * 0.5
-
-      refs.lights.ambient.color.setHex(0x111122)
-      refs.lights.ambient.intensity = 0.2
-    }
-
-    // 星星淡入淡出
-    if (refs.starsPoints) {
-      const starOpacity = moonIntensity > 0 ? 0.3 + moonIntensity * 0.7 : 0
-      refs.starsPoints.material.opacity = starOpacity
-    }
-
-    // 窗户开灯逻辑 (晚上 18:00 - 6:00 且房子已出现)
-    if (refs.windowMesh) {
-      const isNight = hour < 6 || hour > 18
-      if (isNight && dayCount >= 22) {
-        refs.windowMesh.material.emissive.setHex(0xffeb3b)
-        refs.windowMesh.material.emissiveIntensity = 1
-      } else {
-        refs.windowMesh.material.emissive.setHex(0x000000)
-      }
-    }
-  }
 
   // 更新视觉元素：根据天数控制物体的显示/隐藏和缩放
   function updateVisuals() {
@@ -632,7 +597,7 @@ export function createPlanetRenderer(input: {
     }
     
     // 触发一次时间更新，确保窗户灯光状态正确
-    updateTimeOfDay(timeOfDay)
+    // updateTimeOfDay(timeOfDay)
   }
 
   // 创建点击反馈粒子
@@ -736,7 +701,7 @@ export function createPlanetRenderer(input: {
   resizeObserver.observe(host)
 
   // 启动
-  updateTimeOfDay(12)
+  // updateTimeOfDay(12)
   updateVisuals()
   rafId = window.requestAnimationFrame(loop)
 
@@ -752,9 +717,9 @@ export function createPlanetRenderer(input: {
       dayCount = count
       updateVisuals()
     },
-    setTimeOfDay(hour: number) {
-      updateTimeOfDay(hour)
-    },
+    // setTimeOfDay(hour: number) {
+    //   updateTimeOfDay(hour)
+    // },
     dispose() {
       if (rafId != null) window.cancelAnimationFrame(rafId)
       resizeObserver.disconnect()
