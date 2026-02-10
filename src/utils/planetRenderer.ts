@@ -411,7 +411,7 @@ export function createPlanetRenderer(input: {
 
   // 主光/正光 (模拟太阳)
   refs.lights.sun = new DirectionalLight(0xFFB45D, 16) // 暖色主光，高强度
-  refs.lights.sun.position.set(-5,6,-3) // 从左上方照射
+  refs.lights.sun.position.set(-10,12,-1) // 从左上方照射
   refs.lights.sun.castShadow = true
   refs.lights.sun.shadow.mapSize.width = 2048
   refs.lights.sun.shadow.mapSize.height = 2048
