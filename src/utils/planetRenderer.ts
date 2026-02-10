@@ -29,9 +29,11 @@ import {
   BoxGeometry,
   TextureLoader,
   Vector2,
+  Raycaster,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 export type VegetationConfig = {
   grass: number
@@ -76,7 +78,7 @@ function createNoiseTexture(baseColorHex: string, noiseAmount = 15) {
 
 // --- 变形参数 (提取到全局，方便所有函数复用) ---
 const FLATTEN_Y_STRENGTH = 0.11 
-const STRETCH_X_STRENGTH = 0.05 
+const STRETCH_X_STRENGTH = 0 
 const PLANET_RADIUS_BASE = 3.0
 
 // --- 共用变形逻辑 ---
@@ -120,6 +122,7 @@ function getSurfaceTransform(normal: any, radius: number) {
 // --- 纹理加载 ---
 const textureLoader = new TextureLoader()
 const exrLoader = new EXRLoader()
+const gltfLoader = new GLTFLoader()
 
 const planetDiffMap = textureLoader.load('/textures/Material_50_baseColor.jpeg')
 planetDiffMap.colorSpace = SRGBColorSpace
@@ -395,6 +398,7 @@ export function createPlanetRenderer(input: {
     windmillRotor: null,
     charactersGroup: null,
     treeGroups: [],
+    rockGroup: null, // 新增石头组
     starsPoints: null,
     lights: {
       ambient: null,
@@ -443,7 +447,7 @@ export function createPlanetRenderer(input: {
   scene.add(refs.lights.ambient)
 
   // 主光/正光 (模拟太阳)
-  refs.lights.sun = new DirectionalLight(0xFFB45D, 16) // 暖色主光，高强度
+  refs.lights.sun = new DirectionalLight(0xFFB45D, 10) // 暖色主光，高强度
   refs.lights.sun.position.set(-10,12,-1) // 从左上方照射
   refs.lights.sun.castShadow = true
   refs.lights.sun.shadow.mapSize.width = 2048
@@ -508,6 +512,109 @@ export function createPlanetRenderer(input: {
   refs.grassMesh.scale.set(0.01, 0.01, 0.01)
   refs.grassMesh.visible = false
   planetGroup.add(refs.grassMesh)
+
+  // --- 加载并定点放置石头 ---
+  // 石头位置配置 (phi: 0~PI/3, theta: 0~2PI)
+  const ROCK_POSITIONS = [
+    // --- 大石头 (Scale 0.08 - 0.12) 共 6 个 ---
+    { phi: 0.867, theta: 0.225, scale: 0.1, modelIndex: 0 },    
+    { phi: 0.766, theta: 0.903, scale: 0.1, modelIndex: 1 },
+    { phi: 0.356, theta: 0.451, scale: 0.1, modelIndex: 2 },
+    { phi: 0.450, theta: 3.200, scale: 0.11, modelIndex: 1 },
+    { phi: 0.550, theta: 1.200, scale: 0.09, modelIndex: 0 },
+    { phi: 0.680, theta: 6.000, scale: 0.08, modelIndex: 2 },
+
+    // --- 小石头 (Scale 0.03 - 0.06) 共 15 个 ---
+    // 原有小石头
+    { phi: 0.566, theta: 0.503, scale: 0.05, modelIndex: 0 },
+    { phi: 0.600, theta: 1.603, scale: 0.06, modelIndex: 0 },
+    { phi: 0.869, theta: 0.618, scale: 0.04, modelIndex: 1 },
+
+    // 新增小石头
+    // 顶部附近
+    { phi: 0.250, theta: 0.100, scale: 0.04, modelIndex: 1 },
+    { phi: 0.300, theta: 2.100, scale: 0.05, modelIndex: 2 },
+    { phi: 0.150, theta: 4.500, scale: 0.03, modelIndex: 0 },
+    
+    // 中上部
+    { phi: 0.500, theta: 5.500, scale: 0.05, modelIndex: 2 },
+    { phi: 0.420, theta: 4.000, scale: 0.04, modelIndex: 1 },
+    { phi: 0.580, theta: 2.800, scale: 0.03, modelIndex: 2 },
+    
+    // 边缘附近
+    { phi: 0.720, theta: 3.800, scale: 0.06, modelIndex: 0 },
+    { phi: 0.800, theta: 5.200, scale: 0.04, modelIndex: 1 },
+    { phi: 0.850, theta: 1.500, scale: 0.05, modelIndex: 2 },
+    { phi: 0.780, theta: 4.500, scale: 0.04, modelIndex: 0 },
+    { phi: 0.900, theta: 2.500, scale: 0.05, modelIndex: 1 },
+    { phi: 0.820, theta: 0.800, scale: 0.03, modelIndex: 2 },
+  ]
+  const ROCK_LIFT = 0 // 稍微抬高一点，避免穿模
+
+  const rockModels = [
+    '/models/Rock Medium.glb',
+    '/models/Rock Medium (1).glb',
+    '/models/Rock Medium (2).glb',
+  ]
+
+  refs.rockGroup = new Group()
+  planetGroup.add(refs.rockGroup)
+
+  // 预加载所有模型
+  const loadedModels: Group[] = []
+  let loadedCount = 0
+
+  rockModels.forEach((url, index) => {
+    gltfLoader.load(url, (gltf) => {
+      // 处理模型材质
+      const model = gltf.scene
+      model.traverse((child) => {
+        if ((child as Mesh).isMesh) {
+          child.castShadow = true
+          child.receiveShadow = true
+          // 修改石头颜色为灰色
+          if ((child as Mesh).material) {
+            const mat = ((child as Mesh).material as MeshStandardMaterial).clone()
+            mat.color.set(0x888888) 
+            mat.map = null // 移除纹理贴图
+            ;(child as Mesh).material = mat
+          }
+        }
+      })
+      loadedModels[index] = model
+      loadedCount++
+
+      // 当所有模型加载完毕后，开始放置
+      if (loadedCount === rockModels.length) {
+        ROCK_POSITIONS.forEach((config) => {
+          const modelTemplate = loadedModels[config.modelIndex]
+          if (!modelTemplate) return
+
+          const instance = modelTemplate.clone()
+          
+          // 1. 根据球面坐标计算法线
+          const normal = new Vector3().setFromSphericalCoords(1, config.phi, config.theta)
+          
+          // 2. 计算变形后的表面位置
+          const { pos, quaternion } = getSurfaceTransform(normal, PLANET_RADIUS_BASE)
+          
+          // 3. 抬高防止穿模
+          pos.add(normal.clone().multiplyScalar(ROCK_LIFT))
+          
+          instance.position.copy(pos)
+          instance.quaternion.copy(quaternion)
+          
+          // 4. 随机旋转 (绕法线)
+          instance.rotateY(Math.random() * Math.PI * 2)
+          
+          // 5. 应用缩放
+          instance.scale.setScalar(config.scale)
+          
+          refs.rockGroup.add(instance)
+        })
+      }
+    })
+  })
 
   // 种植树木
   const treeCount = 15
@@ -655,6 +762,11 @@ export function createPlanetRenderer(input: {
         refs.ringGlowMesh.material.opacity = 0
     }
     
+    // 6. 石头 (Day 0+ 始终显示，或根据需求控制)
+    if (refs.rockGroup) {
+       refs.rockGroup.visible = true // 默认可见，或者您可以设置为 dayCount >= 1
+    }
+
     // 触发一次时间更新，确保窗户灯光状态正确
     // updateTimeOfDay(timeOfDay)
   }
