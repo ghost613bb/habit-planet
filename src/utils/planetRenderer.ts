@@ -75,42 +75,10 @@ function createNoiseTexture(baseColorHex: string, noiseAmount = 15) {
   return tex
 }
 
-// --- 变形参数 (提取到全局，方便所有函数复用) ---
-const FLATTEN_Y_STRENGTH = 0.11
-const STRETCH_X_STRENGTH = 0
 const PLANET_RADIUS_BASE = 3.0
 
-// --- 共用变形逻辑 ---
-// 输入一个未变形的点（基于标准球体），直接修改其坐标以应用变形
-// radius: 该点所在的标准球半径（用于归一化计算）
-function applyPlanetDeformation(vertex: any, radius: number) {
-  // 计算归一化高度 (0在赤道，1在两极)
-  // 注意：必须使用变形前的原始 Y 值来计算比例，否则多次调用会导致累积误差
-  // 但在此上下文中，传入的 vertex 假定是未变形的
-  const normalizedY = Math.abs(vertex.y) / radius
-
-  // Y轴压缩
-  const scaleY = 1.0 - FLATTEN_Y_STRENGTH * (normalizedY * normalizedY)
-  vertex.y *= scaleY
-
-  // X轴拉伸
-  const scaleX = 1.0 + STRETCH_X_STRENGTH * (1.0 - normalizedY * normalizedY)
-  vertex.x *= scaleX
-}
-
-// --- 辅助函数：计算变形后的表面位置 ---
-// 给定法线和基础半径，计算在变形椭球体上的精确位置和旋转
 function getSurfaceTransform(normal: any, radius: number) {
-  // 1. 先计算标准球体上的位置
   const pos = normal.clone().multiplyScalar(radius)
-
-  // 2. 应用共用变形逻辑
-  applyPlanetDeformation(pos, radius)
-
-  // 3. 计算旋转
-  // 由于表面变形了，法线方向其实也变了，但为了物体站立依然指向球心(视觉上)，
-  // 我们通常还是沿用基于“法线”的旋转，或者需要计算切线空间。
-  // 这里暂时保持沿法线站立，如果倾斜严重再调整法线。
   const up = new Vector3(0, 1, 0)
   const quaternion = new Quaternion()
   quaternion.setFromUnitVectors(up, normal)
@@ -474,36 +442,13 @@ export function createPlanetRenderer(input: {
   const planetRadius = PLANET_RADIUS_BASE
   const grassRadius = 3.05
 
-  // 自定义星球几何体：非线性压缩 Y 轴、拉伸 X 轴
   const planetGeo = new SphereGeometry(planetRadius, 128, 128) // 提高分段数保证圆润
-  const posAttribute = planetGeo.attributes.position
-  const vertex = new Vector3()
-
-  for (let i = 0; i < posAttribute.count; i++) {
-    vertex.fromBufferAttribute(posAttribute, i)
-    // 直接调用共用变形逻辑
-    applyPlanetDeformation(vertex, planetRadius)
-    posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z)
-  }
-
-  planetGeo.computeVertexNormals() // 重新计算法线，确保光照正确
 
   refs.planetMesh = new Mesh(planetGeo, mats.planet)
   refs.planetMesh.receiveShadow = true
   planetGroup.add(refs.planetMesh)
 
-  // 同样对草地几何体应用相同的变形，确保贴合星球表面
   const grassGeo = new SphereGeometry(grassRadius, 128, 128)
-  const grassPosAttr = grassGeo.attributes.position
-  const grassVert = new Vector3()
-
-  for (let i = 0; i < grassPosAttr.count; i++) {
-    grassVert.fromBufferAttribute(grassPosAttr, i)
-    // 直接调用共用变形逻辑
-    applyPlanetDeformation(grassVert, grassRadius)
-    grassPosAttr.setXYZ(i, grassVert.x, grassVert.y, grassVert.z)
-  }
-  grassGeo.computeVertexNormals()
 
   refs.grassMesh = new Mesh(grassGeo, mats.grass)
   refs.grassMesh.receiveShadow = true
