@@ -34,6 +34,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 export type VegetationConfig = {
   grass: number
@@ -90,6 +91,24 @@ function getSurfaceTransform(normal: any, radius: number) {
 // --- 纹理加载 ---
 const textureLoader = new TextureLoader()
 const exrLoader = new EXRLoader()
+const gltfLoader = new GLTFLoader()
+
+// 简单的种子随机数生成器，确保每次生成的位置一致
+class SeededRandom {
+  private seed: number;
+  constructor(seed: number) {
+    this.seed = seed;
+  }
+  // 0 to 1
+  next() {
+    this.seed = (this.seed * 9301 + 49297) % 233280;
+    return this.seed / 233280;
+  }
+  // min to max
+  range(min: number, max: number) {
+    return min + this.next() * (max - min);
+  }
+}
 
 const planetDiffMap = textureLoader.load('/textures/Material.002_diffuse.jpeg')
 planetDiffMap.colorSpace = SRGBColorSpace
@@ -432,7 +451,7 @@ export function createPlanetRenderer(input: {
   scene.add(rimLight)
 
   // 焦点光 (左上角高光)
-  const spotLight = new SpotLight(0xfff4e5, 800.0) // 增强强度以弥补范围缩小
+  const spotLight = new SpotLight(0xfff4e5, 640.0) // 增强强度以弥补范围缩小
   spotLight.position.set(-6, 8, 4) // 调整位置，使其更靠近左侧上方
   spotLight.angle = Math.PI / 11.5 // 更窄的角度 (15度)，使光束更集中
   spotLight.penumbra = 0.3 // 边缘稍微硬一点  0.0 到 1.0
@@ -545,6 +564,152 @@ export function createPlanetRenderer(input: {
   refs.ringGlowMesh.material.opacity = 0
   refs.ringGlowMesh.rotation.copy(refs.ringMesh.rotation)
   planetGroup.add(refs.ringGlowMesh)
+
+  // --- 放置小岩石 ---
+  // 需求：上1/3部分，位置固定（使用固定种子），大小不一，分布不均匀（聚类），美观
+  const rockModels = [
+    '/models/Pebble_Round_1.gltf',
+    '/models/Pebble_Round_4.gltf',
+    '/models/Rock_Medium_1.gltf',
+    '/models/Rock_Medium_2.gltf',
+  ]
+  const rocksGroup = new Group()
+  planetGroup.add(rocksGroup)
+  refs.rocksGroup = rocksGroup
+  
+  // 确保岩石组本身是可见的
+  rocksGroup.visible = true;
+
+  const rng = new SeededRandom(20231027) // 固定种子
+
+  // 预加载模型并生成岩石
+  Promise.all(rockModels.map(url => new Promise<Group>((resolve) => {
+    gltfLoader.load(url, (gltf) => {
+      resolve(gltf.scene)
+    }, undefined, (error) => {
+      console.warn(`Failed to load rock model: ${url}`, error)
+      resolve(new Group()) // 出错时返回空组，避免阻塞
+    })
+  }))).then(loadedModels => {
+    // 过滤掉加载失败的模型
+    const validModels = loadedModels.filter(m => m.children.length > 0)
+    
+    if (validModels.length === 0) return
+
+    // 泥土色/岩石色材质，略微粗糙
+  const rockMaterial = new MeshStandardMaterial({
+    color: 0x8b7e66, // 泥土色 (Stone/Earth tone)
+    roughness: 0.9,
+    flatShading: true
+  });
+
+  // 1. 生成聚类岩石 (Cluster)
+    const clusterCount = 6 // 6个岩石堆
+    for (let i = 0; i < clusterCount; i++) {
+      // 簇中心：限制在上1/3
+      // phi: 0 (北极) -> PI (南极)。上1/3大约是 0 -> PI/3
+      // 为了分布在“上部”，我们限制 phi 在 0.2 到 1.0 之间 (约11度到57度)，避开极点和赤道
+      const clusterPhi = rng.range(0.2, 1.0)
+      const clusterTheta = rng.range(0, Math.PI * 2)
+      
+      // 每个簇包含的岩石数量
+      const rocksInCluster = Math.floor(rng.range(3, 8))
+      
+      for (let j = 0; j < rocksInCluster; j++) {
+        // 在中心附近随机偏移，形成聚类
+        // 使用正态分布近似或简单偏移
+        const offsetPhi = (rng.next() - 0.5) * 0.3 // 偏移范围
+        const offsetTheta = (rng.next() - 0.5) * 0.3
+
+        let phi = clusterPhi + offsetPhi
+        let theta = clusterTheta + offsetTheta
+        
+        // 边界检查
+        if (phi < 0.1) phi = 0.1
+        if (phi > 1.2) phi = 1.2 // 稍微放宽一点边界
+
+        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+        
+        // 随机选择模型
+        const modelIndex = Math.floor(rng.range(0, validModels.length))
+        const originalModel = validModels[modelIndex]
+        const rock = originalModel.clone()
+
+        // 随机大小 (Pebble通常比较小，Rock_Medium比较大)
+        // 限制最大体积，减小缩放比例
+        const baseScale = rockModels[modelIndex].includes('Pebble') ? 0.15 : 0.08
+        const randomScale = baseScale * rng.range(0.8, 1.5) // 随机波动
+        
+        rock.scale.setScalar(randomScale)
+
+        // 放置在表面 (修正：不再减去偏移量，改为紧贴或稍微浮出一点以避免穿模)
+        // 实际上模型原点可能在中心，需要根据包围盒调整，但简单起见，我们不再减去 randomScale
+        const { pos, quaternion } = getSurfaceTransform(normal, planetRadius)
+        rock.position.copy(pos)
+        rock.setRotationFromQuaternion(quaternion)
+
+        // 随机自转
+        rock.rotateX(rng.range(0, Math.PI))
+        rock.rotateY(rng.range(0, Math.PI))
+        rock.rotateZ(rng.range(0, Math.PI))
+
+        // 确保岩石可见
+        rock.visible = true;
+
+        // 开启阴影并应用材质
+        rock.traverse((child) => {
+          if ((child as Mesh).isMesh) {
+            child.castShadow = true
+            child.receiveShadow = true;
+            // 应用泥土色材质
+            (child as Mesh).material = rockMaterial
+            // 确保mesh本身也是可见的
+            child.visible = true;
+          }
+        })
+
+        rocksGroup.add(rock)
+      }
+    }
+
+    // 2. 生成散落岩石 (Scattered)
+    const scatteredCount = 12
+    for (let k = 0; k < scatteredCount; k++) {
+      const phi = rng.range(0.1, 1.1) // 同样限制在上部区域
+      const theta = rng.range(0, Math.PI * 2)
+      
+      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+      
+      const modelIndex = Math.floor(rng.range(0, validModels.length))
+      const rock = validModels[modelIndex].clone()
+      
+      // 限制最大体积
+      const baseScale = rockModels[modelIndex].includes('Pebble') ? 0.12 : 0.06
+      const randomScale = baseScale * rng.range(0.8, 1.2)
+      rock.scale.setScalar(randomScale)
+
+      const { pos, quaternion } = getSurfaceTransform(normal, planetRadius)
+      rock.position.copy(pos)
+      rock.setRotationFromQuaternion(quaternion)
+      rock.rotateY(rng.range(0, Math.PI * 2))
+
+      // 确保岩石可见
+      rock.visible = true;
+
+      rock.traverse((child) => {
+        if ((child as Mesh).isMesh) {
+          child.castShadow = true
+          child.receiveShadow = true;
+           // 应用泥土色材质
+           (child as Mesh).material = rockMaterial
+           // 确保mesh本身也是可见的
+           child.visible = true;
+        }
+      })
+      
+      rocksGroup.add(rock)
+    }
+  })
 
 
   // 更新视觉元素：根据天数控制物体的显示/隐藏和缩放
