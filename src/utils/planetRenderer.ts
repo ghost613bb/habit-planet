@@ -434,7 +434,7 @@ export function createPlanetRenderer(input: {
   // 焦点光 (左上角高光)
   const spotLight = new SpotLight(0xfff4e5, 800.0) // 增强强度以弥补范围缩小
   spotLight.position.set(-6, 8, 4) // 调整位置，使其更靠近左侧上方
-  spotLight.angle = Math.PI / 12 // 更窄的角度 (15度)，使光束更集中
+  spotLight.angle = Math.PI / 11.5 // 更窄的角度 (15度)，使光束更集中
   spotLight.penumbra = 0.3 // 边缘稍微硬一点  0.0 到 1.0
   spotLight.decay = 2 // 物理衰减 
   spotLight.distance = 50
