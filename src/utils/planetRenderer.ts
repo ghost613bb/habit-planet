@@ -23,6 +23,7 @@ import {
   RingGeometry,
   Scene,
   SphereGeometry,
+  SpotLight,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
@@ -98,8 +99,7 @@ const mats = {
   planet: new MeshStandardMaterial({
     map: planetDiffMap,
     color: 0xC4A484, // 浅褐棕色 (Light Brown / Sandy Brown)
-    roughness: 0.8,
-    // metalness: 0.1, // 增加一点金属感，让高光更明显
+    roughness: 1.0, // 范围0-0.1
     normalScale: new Vector2(1.5, 1.5),
   }),
   grass: new MeshStandardMaterial({ map: createNoiseTexture('#77cc77', 20), roughness: 0.9 }),
@@ -413,7 +413,7 @@ export function createPlanetRenderer(input: {
   scene.add(refs.lights.ambient)
 
   // 主光/正光 (模拟太阳)
-  refs.lights.sun = new DirectionalLight(0xfff2d6, 7.5) // 更接近日光的暖白色
+  refs.lights.sun = new DirectionalLight(0xffce84, 7.5) // 更接近日光的暖白色
   refs.lights.sun.position.set(-10, 12, -1) // 从左上方照射
   refs.lights.sun.castShadow = true
   refs.lights.sun.shadow.mapSize.width = 2048
@@ -430,6 +430,17 @@ export function createPlanetRenderer(input: {
   const rimLight = new DirectionalLight(0x4488ff, 0.9) // 强烈的冷色轮廓光
   rimLight.position.set(0, 5, -10) // 从正后上方照射
   scene.add(rimLight)
+
+  // 焦点光 (左上角高光)
+  const spotLight = new SpotLight(0xfff4e5, 800.0) // 增强强度以弥补范围缩小
+  spotLight.position.set(-6, 8, 4) // 调整位置，使其更靠近左侧上方
+  spotLight.angle = Math.PI / 12 // 更窄的角度 (15度)，使光束更集中
+  spotLight.penumbra = 0.3 // 边缘稍微硬一点  0.0 到 1.0
+  spotLight.decay = 2 // 物理衰减 
+  spotLight.distance = 50
+  spotLight.target.position.set(0, 0, 0) // 指向星球中心
+  scene.add(spotLight)
+  scene.add(spotLight.target)
 
   refs.starsPoints = createStars()
   scene.add(refs.starsPoints)
