@@ -575,85 +575,6 @@ export function createPlanetRenderer(input: {
   refs.grassMesh.visible = false
   planetGroup.add(refs.grassMesh)
 
-  // 种植树木
-  const treeCount = 15
-  for (let i = 0; i < treeCount; i++) {
-    let normal
-    let attempts = 0
-    do {
-      const phi = Math.random() * Math.PI
-      const theta = Math.random() * Math.PI * 2
-      normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-      attempts++
-    } while (normal.y < 0.1 && attempts < 20) // 避免生成在两极太陡峭的地方
-
-    if (normal.y > 0.85) continue
-
-    const { pos, quaternion } = getSurfaceTransform(normal, grassRadius - 0.1)
-    const scale = 0.8 + Math.random() * 0.5
-    const ecosystem = createEcosystemPatch(scale)
-    ecosystem.position.copy(pos)
-    ecosystem.setRotationFromQuaternion(quaternion)
-    ecosystem.rotateY(Math.random() * Math.PI * 2)
-    ecosystem.visible = false
-    ecosystem.scale.set(0, 0, 0)
-    ecosystem.userData.targetScale = scale
-    planetGroup.add(ecosystem)
-    refs.treeGroups.push(ecosystem)
-  }
-
-  // 放置房子
-  const houseNormal = new Vector3(0.1, 1, -0.2).normalize()
-  const houseTrans = getSurfaceTransform(houseNormal, grassRadius - 0.1)
-  refs.houseGroup = createCompactHouse(refs)
-  refs.houseGroup.position.copy(houseTrans.pos)
-  refs.houseGroup.setRotationFromQuaternion(houseTrans.quaternion)
-  refs.houseGroup.visible = false
-  refs.houseGroup.scale.set(0, 0, 0)
-  planetGroup.add(refs.houseGroup)
-
-  // 放置风车
-  const windmillNormal = new Vector3(-0.2, 0.9, -0.5).normalize()
-  const windmillTrans = getSurfaceTransform(windmillNormal, grassRadius - 0.1)
-  const windmillData = createWindmill()
-  refs.windmillGroup = windmillData.group
-  refs.windmillRotor = windmillData.rotor
-  refs.windmillGroup.position.copy(windmillTrans.pos)
-  refs.windmillGroup.setRotationFromQuaternion(windmillTrans.quaternion)
-  refs.windmillGroup.rotateY(-Math.PI / 4)
-  refs.windmillGroup.visible = false
-  refs.windmillGroup.scale.set(0, 0, 0)
-  planetGroup.add(refs.windmillGroup)
-
-  // 放置角色
-  const charNormal = new Vector3(-0.2, 1, 0.3).normalize()
-  const charTrans = getSurfaceTransform(charNormal, grassRadius)
-  refs.charactersGroup = new Group()
-  const rabbit = createCuteCharacter('rabbit')
-  rabbit.position.set(-0.5, 0, 0)
-  refs.charactersGroup.add(rabbit)
-  const bear = createCuteCharacter('bear')
-  bear.position.set(0.5, 0, 0)
-  refs.charactersGroup.add(bear)
-  refs.charactersGroup.position.copy(charTrans.pos)
-  refs.charactersGroup.setRotationFromQuaternion(charTrans.quaternion)
-  refs.charactersGroup.visible = false
-  refs.charactersGroup.scale.set(0, 0, 0)
-  planetGroup.add(refs.charactersGroup)
-
-  // 放置光环
-  const ringGeo = new RingGeometry(4.2, 4.4, 128)
-  refs.ringMesh = new Mesh(ringGeo, mats.ring)
-  refs.ringMesh.rotation.x = Math.PI / 2 + 0.4
-  refs.ringMesh.rotation.y = -0.2
-  planetGroup.add(refs.ringMesh)
-
-  const ringGlowGeo = new RingGeometry(4.0, 4.8, 128)
-  refs.ringGlowMesh = new Mesh(ringGlowGeo, mats.ring.clone())
-  refs.ringGlowMesh.material.opacity = 0
-  refs.ringGlowMesh.rotation.copy(refs.ringMesh.rotation)
-  planetGroup.add(refs.ringGlowMesh)
-
   // --- 放置小岩石和草丛 ---
   // 需求：上1/3部分，位置固定（使用固定种子），大小不一，分布不均匀（聚类），美观
   const rockModels = [
@@ -1053,70 +974,6 @@ export function createPlanetRenderer(input: {
 
   // 更新视觉元素：根据天数控制物体的显示/隐藏和缩放
   function updateVisuals() {
-    // 1. 草地 (Day 3+)
-    if (dayCount >= 3) {
-      if (!refs.grassMesh.visible) refs.grassMesh.visible = true
-      let grassProgress = (dayCount - 3) / 7
-      grassProgress = Math.max(0, Math.min(1, grassProgress))
-      refs.grassMesh.userData.targetScale = 0.8 + grassProgress * 0.2
-    } else {
-      refs.grassMesh.visible = false
-    }
-
-    // 2. 树木 (Day 10+)
-    if (dayCount >= 10) {
-      const treeDays = dayCount - 10
-      const treesToShow = Math.min(Math.floor(treeDays) + 1, refs.treeGroups.length)
-      for (let i = 0; i < refs.treeGroups.length; i++) {
-        const tree = refs.treeGroups[i]
-        if (i < treesToShow) {
-          if (!tree.visible) {
-            tree.visible = true
-            tree.scale.set(0.1, 0.1, 0.1)
-          }
-        } else {
-          // 还没长出来的树保持隐藏
-        }
-      }
-    } else {
-      refs.treeGroups.forEach((t: any) => t.visible = false)
-    }
-
-    // 3. 房子 (Day 22+)
-    if (dayCount >= 22) {
-      if (!refs.houseGroup.visible) {
-        refs.houseGroup.visible = true
-        refs.houseGroup.scale.set(0.1, 0.1, 0.1)
-      }
-    } else {
-      refs.houseGroup.visible = false
-    }
-
-    // 4. 风车 (Day 30+)
-    if (dayCount >= 30) {
-      if (!refs.windmillGroup.visible) {
-        refs.windmillGroup.visible = true
-        refs.windmillGroup.scale.set(0.1, 0.1, 0.1)
-      }
-    } else {
-      refs.windmillGroup.visible = false
-    }
-
-    // 5. 角色与光环 (Day 35+)
-    if (dayCount >= 35) {
-      if (!refs.charactersGroup.visible) {
-        refs.charactersGroup.visible = true
-        refs.charactersGroup.scale.set(0.1, 0.1, 0.1)
-      }
-      const ringProgress = Math.min((dayCount - 35) / 15, 1)
-      refs.ringMesh.material.opacity = ringProgress * 0.6
-      refs.ringGlowMesh.material.opacity = ringProgress * 0.3
-    } else {
-      refs.charactersGroup.visible = false
-      refs.ringMesh.material.opacity = 0
-      refs.ringGlowMesh.material.opacity = 0
-    }
-
     // 触发一次时间更新，确保窗户灯光状态正确
     // updateTimeOfDay(timeOfDay)
   }
@@ -1165,33 +1022,6 @@ export function createPlanetRenderer(input: {
     if (refs.grassMesh && refs.grassMesh.visible) {
       const target = refs.grassMesh.userData.targetScale || 0.01
       refs.grassMesh.scale.lerp(new Vector3(target, target, target), 0.05)
-    }
-
-    // 平滑缩放树木
-    refs.treeGroups.forEach((tree: any) => {
-      if (tree.visible) {
-        const target = tree.userData.targetScale || 1
-        tree.scale.lerp(new Vector3(target, target, target), 0.05)
-      }
-    })
-
-    // 平滑缩放房子
-    if (refs.houseGroup && refs.houseGroup.visible) {
-      refs.houseGroup.scale.lerp(new Vector3(1, 1, 1), 0.05)
-    }
-
-    // 平滑缩放风车并旋转叶片
-    if (refs.windmillGroup && refs.windmillGroup.visible) {
-      refs.windmillGroup.scale.lerp(new Vector3(1, 1, 1), 0.05)
-      if (refs.windmillRotor) refs.windmillRotor.rotation.z -= 0.03
-    }
-
-    // 平滑缩放角色并添加浮动动画
-    if (refs.charactersGroup && refs.charactersGroup.visible) {
-      refs.charactersGroup.scale.lerp(new Vector3(1, 1, 1), 0.05)
-      refs.charactersGroup.children.forEach((child: any, idx: number) => {
-        child.position.y = Math.sin(Date.now() * 0.005 + idx) * 0.05
-      })
     }
 
     // 更新粒子
