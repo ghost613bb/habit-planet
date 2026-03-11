@@ -497,12 +497,35 @@ export function createPlanetRenderer(input: {
 
   const planetGeo = new SphereGeometry(planetRadius, 512, 512) // 提高分段数以支持 displacementMap 细节
 
+  // 调整星球形状：通过修改几何体顶点来实现
+  // 需求：上1/3部分稍微平坦，整体呈椭球状
+  const positions = planetGeo.attributes.position
+  const v = new Vector3()
+  // 基础压扁比例 (原 0.92)
+  const baseScaleY = 0.92
+  // 顶部额外压扁比例 (使上部更平坦)
+  const topFlattenScale = 0.80 
+
+  for (let i = 0; i < positions.count; i++) {
+    v.fromBufferAttribute(positions, i)
+    
+    let yScale = baseScaleY
+    // 对上半球应用额外的压扁，模拟"顶部平坦"的效果
+    // 使用平滑过渡以避免接缝，虽然 y>0 硬切也行，但平滑更好
+    if (v.y > 0) {
+      yScale *= topFlattenScale
+    }
+    v.y *= yScale
+    
+    positions.setXYZ(i, v.x, v.y, v.z)
+  }
+  planetGeo.computeVertexNormals() // 重新计算法线，这对光照和贴图至关重要
+
   refs.planetMesh = new Mesh(planetGeo, mats.planet)
   refs.planetMesh.castShadow = true
   refs.planetMesh.receiveShadow = true
-  // 调整星球轮廓：Y轴压扁，形成椭球体
-  const planetScaleY = 0.92
-  refs.planetMesh.scale.set(1, planetScaleY, 1)
+  // 移除之前的缩放，现在形状已经烘焙到几何体中了
+  refs.planetMesh.scale.set(1, 1, 1)
   planetGroup.add(refs.planetMesh)
 
   // 辅助函数：获取星球表面坐标和旋转（支持非均匀缩放）
@@ -512,15 +535,21 @@ export function createPlanetRenderer(input: {
   const surfaceOffset = 0.05; 
 
   const getSurfaceTransform = (normal: Vector3, radius: number) => {
-    // 1. 计算椭球体表面点
-    // 增加 surfaceOffset 以补偿 displacementMap 造成的高度隆起
-    const pos = normal.clone().multiplyScalar(radius + surfaceOffset)
-    pos.y *= planetScaleY
+    // 1. 计算变形后的表面点
+    // 先获取标准球体上的点 (radius + surfaceOffset 确保在地面之上)
+    const pos = normal.clone().normalize().multiplyScalar(radius + surfaceOffset)
     
-    // 2. 计算该点的切面旋转
-    // 椭球体表面的法线不再是简单的 pos.normalize()，而是 (x, y/scaleY^2, z).normalize()
-    // 参考椭球体法线公式
-    const surfaceNormal = new Vector3(pos.x, pos.y / (planetScaleY * planetScaleY), pos.z).normalize()
+    // 应用与几何体相同的变形逻辑
+    let yScale = baseScaleY
+    if (pos.y > 0) {
+      yScale *= topFlattenScale
+    }
+    pos.y *= yScale
+    
+    // 2. 计算该点的切面法线
+    // 对于缩放球体 (x, y*s, z)，法线是 (x, y/s, z)
+    // 这里 s = yScale
+    const surfaceNormal = new Vector3(pos.x, pos.y / (yScale * yScale), pos.z).normalize()
     
     const quaternion = new Quaternion()
     quaternion.setFromUnitVectors(new Vector3(0, 1, 0), surfaceNormal)
