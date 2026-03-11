@@ -675,6 +675,11 @@ export function createPlanetRenderer(input: {
     // '/models/grass_patch_3.gltf', // 移除：形状偏正方形，不自然
   ]
   
+  const flowerModels: string[] = [
+    '/models/Flower_3_Single.gltf',
+    '/models/Flower_4_Single.gltf',
+  ]
+
   const rocksGroup = new Group()
   planetGroup.add(rocksGroup)
   refs.rocksGroup = rocksGroup
@@ -718,6 +723,17 @@ export function createPlanetRenderer(input: {
         console.warn(`Failed to load grass patch model: ${url}`, error)
         resolve(new Group())
       })
+    })),
+    // 加载花朵
+    ...flowerModels.map(url => new Promise<Group>((resolve) => {
+      gltfLoader.load(url, (gltf) => {
+        gltf.scene.userData.type = 'flower'; // 标记为花朵
+        gltf.scene.userData.modelName = url;
+        resolve(gltf.scene)
+      }, undefined, (error) => {
+        console.warn(`Failed to load flower model: ${url}`, error)
+        resolve(new Group())
+      })
     }))
   ]).then(loadedModels => {
     // --- 岩石大小配置 ---
@@ -743,8 +759,9 @@ export function createPlanetRenderer(input: {
     const validRocks = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'rock')
     const validGrasses = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'grass')
     const validGrassPatches = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'grassPatch')
+    const validFlowers = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'flower')
     
-    if (validRocks.length === 0 && validGrasses.length === 0 && validGrassPatches.length === 0) return
+    if (validRocks.length === 0 && validGrasses.length === 0 && validGrassPatches.length === 0 && validFlowers.length === 0) return
 
     // 材质定义
     const rockMaterial = new MeshStandardMaterial({
@@ -760,6 +777,13 @@ export function createPlanetRenderer(input: {
       side: 2 // DoubleSide
     });
 
+    const flowerPetalMaterial = new MeshStandardMaterial({
+      color: 0x195cac, // 蓝紫色 (Blue Violet)
+      roughness: 0.8,
+      flatShading: true,
+      side: 2
+    });
+    
     // 辅助函数：放置单个物体
     const placeObject = (obj: Object3D, normal: Vector3, scale: number, material: any) => {
       const clone = obj.clone()
@@ -959,6 +983,70 @@ export function createPlanetRenderer(input: {
       }
       
       placeObject(grassPatch, normal, 1.0, grassMaterial)
+    }
+
+    // 4. 生成花朵 (Flowers) - 上1/5区域
+    const flowerCount = 4
+    for (let i = 0; i < flowerCount; i++) {
+      if (validFlowers.length === 0) break;
+      
+      // 上1/5区域: y > 0.6
+      // y = cos(phi), so phi < acos(0.6) ≈ 0.92
+      // 为了更集中在顶部，取 phi [0.1, 0.7]
+      // 避免排成一条线：增加随机偏移，并确保 theta 分布均匀
+      const phi = rng.range(0.1, 0.7) 
+      // 使用更随机的 theta 生成方式，或者确保每次间隔较大
+      const theta = rng.range(0, Math.PI * 2) 
+
+      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+      
+      const modelIndex = Math.floor(rng.range(0, validFlowers.length))
+      const originalModel = validFlowers[modelIndex].clone()
+      
+      // 花朵需要稍微大一点才能看清
+      // --- 如何调节花朵大小 ---
+      // 修改这里的 rng.range(最小值, 最大值) 参数
+      // 目前是 0.08 到 0.12，数值越大，花朵越大
+      const scale = rng.range(0.08, 0.5)
+      
+      // 特殊处理花朵材质：区分花瓣和叶子
+      // 如果使用 placeObject 会覆盖所有材质，所以这里手动放置
+      const clone = originalModel.clone()
+      clone.scale.setScalar(scale)
+      
+      const { pos, quaternion } = getSurfaceTransform(normal, planetRadius)
+      clone.position.copy(pos)
+      clone.setRotationFromQuaternion(quaternion)
+      
+      // 1. 随机 Y 轴旋转 (朝向)
+      clone.rotateY(rng.range(0, Math.PI * 2))
+
+      // 2. 增加随机倾斜 (弯曲效果)
+      // rotateX 和 rotateZ 可以让花朵不那么垂直，产生自然的倾斜
+      const tiltAngle = rng.range(0.1, 0.4) // 倾斜角度范围
+      const tiltAxis = rng.range(0, Math.PI * 2) // 倾斜方向
+      clone.rotateX(Math.cos(tiltAxis) * tiltAngle)
+      clone.rotateZ(Math.sin(tiltAxis) * tiltAngle)
+      
+      clone.visible = true;
+      clone.traverse((child) => {
+        if ((child as Mesh).isMesh) {
+          child.castShadow = true
+          child.receiveShadow = true
+          child.visible = true;
+          
+          // 尝试根据材质名称区分
+          const matName = (child as Mesh).material && ((child as Mesh).material as any).name ? ((child as Mesh).material as any).name.toLowerCase() : '';
+          
+          if (matName.includes('flower') || matName.includes('petal')) {
+             (child as Mesh).material = flowerPetalMaterial
+          } else {
+             // 茎叶使用草的材质
+             (child as Mesh).material = grassMaterial
+          }
+        }
+      })
+      rocksGroup.add(clone)
     }
   })
 
