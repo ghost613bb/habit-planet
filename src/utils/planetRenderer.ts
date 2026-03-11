@@ -602,6 +602,25 @@ export function createPlanetRenderer(input: {
     rafId = window.requestAnimationFrame(loop)
     controls.update()
 
+    // --- 动态调整高光强度 ---
+    // 解决近距离观察时高光过曝导致看不清植被的问题
+    // 当相机靠近星球时，降低高光强度
+    if (refs.lights && refs.lights.spotLight) {
+      const dist = camera.position.distanceTo(controls.target); // 假设 target 在原点附近
+      // 距离范围: minDistance=5, 默认观察距离~12
+      // 映射逻辑: 距离 5 -> 强度 800; 距离 12+ -> 强度 5000
+      const minIntensity = 800;
+      const maxIntensity = 5000;
+      const minDist = 5;
+      const maxDist = 12;
+      
+      const t = Math.min(1, Math.max(0, (dist - minDist) / (maxDist - minDist)));
+      // 使用平滑过渡 smoothstep 效果更好
+      const smoothT = t * t * (3 - 2 * t); 
+      
+      refs.lights.spotLight.intensity = minIntensity + smoothT * (maxIntensity - minIntensity);
+    }
+
     // 简单的自转
     planetGroup.rotation.y += 0.0005
 

@@ -7,7 +7,7 @@ export function setupLights(scene: Scene) {
 
   // 2. 主光源 (模拟太阳) - 暖色调
   // 调整为更柔和的橙黄色
-  const sunLight = new DirectionalLight(0xffce84, 2.5) 
+  const sunLight = new DirectionalLight(0xffce84, 5.5) 
   sunLight.position.set(10, 8, 8)
   sunLight.castShadow = true
   sunLight.shadow.mapSize.width = 2048
@@ -26,18 +26,18 @@ export function setupLights(scene: Scene) {
   scene.add(sunLight)
 
   // 3. 辅助光 (模拟月光/冷光) - 稍微增强一点，补充阴影细节
-  const moonLight = new DirectionalLight(0xaaccff, 0.4)
+  const moonLight = new DirectionalLight(0xaaccff, 0.5)
   moonLight.position.set(-8, 5, -8)
   scene.add(moonLight)
 
-  // 4. 新增：左上角高光 (模拟聚焦亮光)
-  // 亮白色，集中照亮左上方区域
-  const spotLight = new SpotLight(0xffffff, 15.0); // 强度高
-  spotLight.position.set(-6, 8, 4); // 左上前方
+  // 4. 新增：高光 (与主光源对齐，增强立体感)
+  // 亮白色，集中照亮受光面
+  const spotLight = new SpotLight(0xffe6c1, 5000.0); // 强度高
+  spotLight.position.set(10, 8, 8); // 与主光源位置一致，增强高光
   spotLight.target.position.set(0, 0, 0); // 指向星球中心
-  spotLight.angle = Math.PI / 12; // 窄角度，约15度，形成聚光效果
+  spotLight.angle = Math.PI / 14; // 稍微扩大角度，覆盖更多受光面
   spotLight.penumbra = 0.5; // 边缘柔和度
-  spotLight.distance = 30; // 照射距离
+  spotLight.distance = 30; // 增加照射距离
   spotLight.castShadow = true;
   scene.add(spotLight);
   scene.add(spotLight.target); // 必须添加 target 到场景才能生效
