@@ -19,7 +19,7 @@ import {
   Points,
   PointsMaterial,
   Quaternion,
-  RepeatWrapping,
+  RepeatWrapping, // 添加 RepeatWrapping
   RingGeometry,
   Scene,
   SphereGeometry,
@@ -35,6 +35,7 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { TIFFLoader } from 'three/examples/jsm/loaders/TIFFLoader.js'
 
 export type VegetationConfig = {
   grass: number
@@ -92,6 +93,7 @@ function getSurfaceTransform(normal: any, radius: number) {
 const textureLoader = new TextureLoader()
 const exrLoader = new EXRLoader()
 const gltfLoader = new GLTFLoader()
+const tiffLoader = new TIFFLoader()
 
 // 简单的种子随机数生成器，确保每次生成的位置一致
 class SeededRandom {
@@ -110,18 +112,16 @@ class SeededRandom {
   }
 }
 
-const planetDiffMap = textureLoader.load('/textures/Material.002_diffuse.jpeg')
-planetDiffMap.colorSpace = SRGBColorSpace
-
 // --- 材质定义 ---
 const mats = {
   planet: new MeshStandardMaterial({
-    map: planetDiffMap,
+    // map 和 displacementMap 将在 TIFF 加载完成后设置
+    displacementScale: 0.3, // 凹凸程度，根据需要微调
     color: 0xC4A484, // 浅褐棕色 (Light Brown / Sandy Brown)
     roughness: 1.0, // 范围0-0.1
     normalScale: new Vector2(1.5, 1.5),
   }),
-  grass: new MeshStandardMaterial({ map: createNoiseTexture('#77cc77', 20), roughness: 0.9 }),
+  grass: new MeshStandardMaterial({ map: createNoiseTexture('#6b7045', 20), roughness: 0.9 }),
   houseBody: new MeshStandardMaterial({ map: createNoiseTexture('#f5deb3', 10), roughness: 0.8 }),
   houseRoof: new MeshStandardMaterial({ map: createNoiseTexture('#e07a5f', 20), roughness: 0.7 }),
   door: new MeshStandardMaterial({ color: 0x8b4513 }),
@@ -131,10 +131,33 @@ const mats = {
   leaves2: new MeshStandardMaterial({ color: 0x55aa55, roughness: 0.9, flatShading: true }),
   rabbit: new MeshStandardMaterial({ color: 0xffb7b2, roughness: 0.7 }),
   bear: new MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 }),
-  rock: new MeshStandardMaterial({ color: 0x888888, roughness: 0.8, flatShading: true }),
-  ring: new MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.0, side: 2 }), // DoubleSide
+  rock: new MeshStandardMaterial({ color: 0x808080, roughness: 0.9 }),
+  ring: new MeshStandardMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.4,
+    side: 2,
+    roughness: 0.5,
+    metalness: 0.1,
+  }),
   blade: new MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }),
 }
+
+// 异步加载 TIFF 贴图
+tiffLoader.load('/textures/lroc_color_16bit_srgb_4k.tif', (texture) => {
+  texture.colorSpace = SRGBColorSpace
+  texture.wrapS = RepeatWrapping
+  texture.wrapT = RepeatWrapping
+  mats.planet.map = texture
+  mats.planet.needsUpdate = true
+}, undefined, (err) => console.error('Failed to load planet color tiff:', err))
+
+tiffLoader.load('/textures/ldem_16_uint.tif', (texture) => {
+  texture.wrapS = RepeatWrapping
+  texture.wrapT = RepeatWrapping
+  mats.planet.displacementMap = texture
+  mats.planet.needsUpdate = true
+}, undefined, (err) => console.error('Failed to load planet displacement tiff:', err))
 
 // --- 物体生成函数 ---
 
@@ -432,7 +455,7 @@ export function createPlanetRenderer(input: {
   scene.add(refs.lights.ambient)
 
   // 主光/正光 (模拟太阳)
-  refs.lights.sun = new DirectionalLight(0xffce84, 7.5) // 更接近日光的暖白色
+  refs.lights.sun = new DirectionalLight(0xffce84, 6.5) // 更接近日光的暖白色
   refs.lights.sun.position.set(-10, 12, -1) // 从左上方照射
   refs.lights.sun.castShadow = true
   refs.lights.sun.shadow.mapSize.width = 2048
@@ -451,9 +474,9 @@ export function createPlanetRenderer(input: {
   scene.add(rimLight)
 
   // 焦点光 (左上角高光)
-  const spotLight = new SpotLight(0xfff4e5, 640.0) // 增强强度以弥补范围缩小
+  const spotLight = new SpotLight(0xffffff, 200.0) // 增强强度以弥补范围缩小
   spotLight.position.set(-6, 8, 4) // 调整位置，使其更靠近左侧上方
-  spotLight.angle = Math.PI / 11.5 // 更窄的角度 (15度)，使光束更集中
+  spotLight.angle = Math.PI / 10 // 更窄的角度 (15度)，使光束更集中
   spotLight.penumbra = 0.3 // 边缘稍微硬一点  0.0 到 1.0
   spotLight.decay = 2 // 物理衰减 
   spotLight.distance = 50
@@ -472,11 +495,40 @@ export function createPlanetRenderer(input: {
   const planetRadius = PLANET_RADIUS_BASE
   const grassRadius = 3.05
 
-  const planetGeo = new SphereGeometry(planetRadius, 128, 128) // 提高分段数保证圆润
+  const planetGeo = new SphereGeometry(planetRadius, 512, 512) // 提高分段数以支持 displacementMap 细节
 
   refs.planetMesh = new Mesh(planetGeo, mats.planet)
+  refs.planetMesh.castShadow = true
   refs.planetMesh.receiveShadow = true
+  // 调整星球轮廓：Y轴压扁，形成椭球体
+  const planetScaleY = 0.92
+  refs.planetMesh.scale.set(1, planetScaleY, 1)
   planetGroup.add(refs.planetMesh)
+
+  // 辅助函数：获取星球表面坐标和旋转（支持非均匀缩放）
+  // 修正：由于 displacementScale 设置为 0.3，导致地表高度增加，物体需要相应提升高度
+  // DisplacementMap 默认会向外挤出，最大挤出量约为 displacementScale
+  // 我们取一个较小值，宁可让物体稍微陷入地下（自然），也不要悬空（穿帮）
+  const surfaceOffset = 0.05; 
+
+  const getSurfaceTransform = (normal: Vector3, radius: number) => {
+    // 1. 计算椭球体表面点
+    // 增加 surfaceOffset 以补偿 displacementMap 造成的高度隆起
+    const pos = normal.clone().multiplyScalar(radius + surfaceOffset)
+    pos.y *= planetScaleY
+    
+    // 2. 计算该点的切面旋转
+    // 椭球体表面的法线不再是简单的 pos.normalize()，而是 (x, y/scaleY^2, z).normalize()
+    // 参考椭球体法线公式
+    const surfaceNormal = new Vector3(pos.x, pos.y / (planetScaleY * planetScaleY), pos.z).normalize()
+    
+    const quaternion = new Quaternion()
+    quaternion.setFromUnitVectors(new Vector3(0, 1, 0), surfaceNormal)
+    
+    return { pos, quaternion }
+  }
+
+
 
   const grassGeo = new SphereGeometry(grassRadius, 128, 128)
 
@@ -565,7 +617,7 @@ export function createPlanetRenderer(input: {
   refs.ringGlowMesh.rotation.copy(refs.ringMesh.rotation)
   planetGroup.add(refs.ringGlowMesh)
 
-  // --- 放置小岩石 ---
+  // --- 放置小岩石和草丛 ---
   // 需求：上1/3部分，位置固定（使用固定种子），大小不一，分布不均匀（聚类），美观
   const rockModels = [
     '/models/Pebble_Round_1.gltf',
@@ -573,6 +625,19 @@ export function createPlanetRenderer(input: {
     '/models/Rock_Medium_1.gltf',
     '/models/Rock_Medium_2.gltf',
   ]
+  const grassModels = [
+    '/models/Grass_Common_Short.gltf',
+    '/models/Grass_Common_Tall.gltf',
+    '/models/Grass_Wispy_Short.gltf',
+    '/models/Grass_Wispy_Tall.gltf',
+  ]
+  
+  const grassPatchModels: string[] = [
+    '/models/grass_patch.gltf',
+    '/models/grass_patch_2.gltf',
+    // '/models/grass_patch_3.gltf', // 移除：形状偏正方形，不自然
+  ]
+  
   const rocksGroup = new Group()
   planetGroup.add(rocksGroup)
   refs.rocksGroup = rocksGroup
@@ -582,132 +647,281 @@ export function createPlanetRenderer(input: {
 
   const rng = new SeededRandom(20231027) // 固定种子
 
-  // 预加载模型并生成岩石
-  Promise.all(rockModels.map(url => new Promise<Group>((resolve) => {
-    gltfLoader.load(url, (gltf) => {
-      resolve(gltf.scene)
-    }, undefined, (error) => {
-      console.warn(`Failed to load rock model: ${url}`, error)
-      resolve(new Group()) // 出错时返回空组，避免阻塞
-    })
-  }))).then(loadedModels => {
-    // 过滤掉加载失败的模型
-    const validModels = loadedModels.filter(m => m.children.length > 0)
-    
-    if (validModels.length === 0) return
-
-    // 泥土色/岩石色材质，略微粗糙
-  const rockMaterial = new MeshStandardMaterial({
-    color: 0x8b7e66, // 泥土色 (Stone/Earth tone)
-    roughness: 0.9,
-    flatShading: true
-  });
-
-  // 1. 生成聚类岩石 (Cluster)
-    const clusterCount = 6 // 6个岩石堆
-    for (let i = 0; i < clusterCount; i++) {
-      // 簇中心：限制在上1/3
-      // phi: 0 (北极) -> PI (南极)。上1/3大约是 0 -> PI/3
-      // 为了分布在“上部”，我们限制 phi 在 0.2 到 1.0 之间 (约11度到57度)，避开极点和赤道
-      const clusterPhi = rng.range(0.2, 1.0)
-      const clusterTheta = rng.range(0, Math.PI * 2)
-      
-      // 每个簇包含的岩石数量
-      const rocksInCluster = Math.floor(rng.range(3, 8))
-      
-      for (let j = 0; j < rocksInCluster; j++) {
-        // 在中心附近随机偏移，形成聚类
-        // 使用正态分布近似或简单偏移
-        const offsetPhi = (rng.next() - 0.5) * 0.3 // 偏移范围
-        const offsetTheta = (rng.next() - 0.5) * 0.3
-
-        let phi = clusterPhi + offsetPhi
-        let theta = clusterTheta + offsetTheta
-        
-        // 边界检查
-        if (phi < 0.1) phi = 0.1
-        if (phi > 1.2) phi = 1.2 // 稍微放宽一点边界
-
-        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-        
-        // 随机选择模型
-        const modelIndex = Math.floor(rng.range(0, validModels.length))
-        const originalModel = validModels[modelIndex]
-        const rock = originalModel.clone()
-
-        // 随机大小 (Pebble通常比较小，Rock_Medium比较大)
-        // 限制最大体积，减小缩放比例
-        const baseScale = rockModels[modelIndex].includes('Pebble') ? 0.15 : 0.08
-        const randomScale = baseScale * rng.range(0.8, 1.5) // 随机波动
-        
-        rock.scale.setScalar(randomScale)
-
-        // 放置在表面 (修正：不再减去偏移量，改为紧贴或稍微浮出一点以避免穿模)
-        // 实际上模型原点可能在中心，需要根据包围盒调整，但简单起见，我们不再减去 randomScale
-        const { pos, quaternion } = getSurfaceTransform(normal, planetRadius)
-        rock.position.copy(pos)
-        rock.setRotationFromQuaternion(quaternion)
-
-        // 随机自转
-        rock.rotateX(rng.range(0, Math.PI))
-        rock.rotateY(rng.range(0, Math.PI))
-        rock.rotateZ(rng.range(0, Math.PI))
-
-        // 确保岩石可见
-        rock.visible = true;
-
-        // 开启阴影并应用材质
-        rock.traverse((child) => {
-          if ((child as Mesh).isMesh) {
-            child.castShadow = true
-            child.receiveShadow = true;
-            // 应用泥土色材质
-            (child as Mesh).material = rockMaterial
-            // 确保mesh本身也是可见的
-            child.visible = true;
-          }
-        })
-
-        rocksGroup.add(rock)
+  // 预加载模型并生成装饰物（岩石+草丛）
+  Promise.all([
+    // 加载岩石
+    ...rockModels.map(url => new Promise<Group>((resolve) => {
+      gltfLoader.load(url, (gltf) => {
+        gltf.scene.userData.type = 'rock'; // 标记为岩石
+        gltf.scene.userData.modelName = url;
+        resolve(gltf.scene)
+      }, undefined, (error) => {
+        console.warn(`Failed to load rock model: ${url}`, error)
+        resolve(new Group()) 
+      })
+    })),
+    // 加载草丛
+    ...grassModels.map(url => new Promise<Group>((resolve) => {
+      gltfLoader.load(url, (gltf) => {
+        gltf.scene.userData.type = 'grass'; // 标记为草
+        gltf.scene.userData.modelName = url;
+        resolve(gltf.scene)
+      }, undefined, (error) => {
+        console.warn(`Failed to load grass model: ${url}`, error)
+        resolve(new Group())
+      })
+    })),
+    // 加载草皮
+    ...grassPatchModels.map(url => new Promise<Group>((resolve) => {
+      gltfLoader.load(url, (gltf) => {
+        gltf.scene.userData.type = 'grassPatch'; // 标记为草皮
+        gltf.scene.userData.modelName = url;
+        resolve(gltf.scene)
+      }, undefined, (error) => {
+        console.warn(`Failed to load grass patch model: ${url}`, error)
+        resolve(new Group())
+      })
+    }))
+  ]).then(loadedModels => {
+    // --- 岩石大小配置 ---
+    // 在这里调整岩石的大小范围
+    const rockScaleConfig = {
+      // 聚集分布的岩石 (通常更大)
+      cluster: {
+        pebbleBase: 0.12, // 鹅卵石基准大小 (原 0.15，调小了一些)
+        rockBase: 0.06,   // 岩石基准大小 (原 0.08，调小了一些)
+        variationMin: 0.8, // 随机变化下限
+        variationMax: 1.5  // 随机变化上限
+      },
+      // 散落分布的岩石 (通常较小)
+      scattered: {
+        pebbleBase: 0.10, // 鹅卵石基准大小 (原 0.12，调小了一些)
+        rockBase: 0.05,   // 岩石基准大小 (原 0.06，调小了一些)
+        variationMin: 0.8, // 随机变化下限
+        variationMax: 1.2  // 随机变化上限
       }
-    }
+    };
 
-    // 2. 生成散落岩石 (Scattered)
-    const scatteredCount = 12
-    for (let k = 0; k < scatteredCount; k++) {
-      const phi = rng.range(0.1, 1.1) // 同样限制在上部区域
-      const theta = rng.range(0, Math.PI * 2)
-      
-      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-      
-      const modelIndex = Math.floor(rng.range(0, validModels.length))
-      const rock = validModels[modelIndex].clone()
-      
-      // 限制最大体积
-      const baseScale = rockModels[modelIndex].includes('Pebble') ? 0.12 : 0.06
-      const randomScale = baseScale * rng.range(0.8, 1.2)
-      rock.scale.setScalar(randomScale)
+    // 过滤掉加载失败的模型并分类
+    const validRocks = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'rock')
+    const validGrasses = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'grass')
+    const validGrassPatches = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'grassPatch')
+    
+    if (validRocks.length === 0 && validGrasses.length === 0 && validGrassPatches.length === 0) return
 
+    // 材质定义
+    const rockMaterial = new MeshStandardMaterial({
+      color: 0x8b7e66, // 泥土色
+      roughness: 0.9,
+      flatShading: true
+    });
+    
+    const grassMaterial = new MeshStandardMaterial({
+      color: 0x7e885d, // 苔藓绿 (Moss Green) - 枯黄与暗绿的中间色
+      roughness: 0.9,
+      flatShading: true,
+      side: 2 // DoubleSide
+    });
+
+    // 辅助函数：放置单个物体
+    const placeObject = (obj: Object3D, normal: Vector3, scale: number, material: any) => {
+      const clone = obj.clone()
+      clone.scale.setScalar(scale)
+      
       const { pos, quaternion } = getSurfaceTransform(normal, planetRadius)
-      rock.position.copy(pos)
-      rock.setRotationFromQuaternion(quaternion)
-      rock.rotateY(rng.range(0, Math.PI * 2))
-
-      // 确保岩石可见
-      rock.visible = true;
-
-      rock.traverse((child) => {
+      clone.position.copy(pos)
+      clone.setRotationFromQuaternion(quaternion)
+      clone.rotateY(rng.range(0, Math.PI * 2))
+      
+      clone.visible = true;
+      clone.traverse((child) => {
         if ((child as Mesh).isMesh) {
           child.castShadow = true
           child.receiveShadow = true;
-           // 应用泥土色材质
-           (child as Mesh).material = rockMaterial
-           // 确保mesh本身也是可见的
-           child.visible = true;
+          (child as Mesh).material = material
+          child.visible = true;
         }
       })
+      rocksGroup.add(clone)
+    }
+
+    // 1. 生成聚类岩石 (Cluster) - 保持原有逻辑
+    const clusterCount = 6 
+    for (let i = 0; i < clusterCount; i++) {
+      const clusterPhi = rng.range(0.2, 1.0)
+      const clusterTheta = rng.range(0, Math.PI * 2)
+      const rocksInCluster = Math.floor(rng.range(3, 8))
       
-      rocksGroup.add(rock)
+      // 在岩石堆附近添加草丛 - 增加数量，使岩石周围更茂密
+      const grassInCluster = Math.floor(rng.range(18, 23)) 
+      
+      // 放置岩石
+      for (let j = 0; j < rocksInCluster; j++) {
+        if (validRocks.length === 0) break;
+        const offsetPhi = (rng.next() - 0.5) * 0.3
+        const offsetTheta = (rng.next() - 0.5) * 0.3
+        let phi = clusterPhi + offsetPhi
+        let theta = clusterTheta + offsetTheta
+        if (phi < 0.1) phi = 0.1
+        if (phi > 1.2) phi = 1.2
+
+        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+        const modelIndex = Math.floor(rng.range(0, validRocks.length))
+        const originalModel = validRocks[modelIndex]
+        const baseScale = originalModel.userData.modelName.includes('Pebble') 
+          ? rockScaleConfig.cluster.pebbleBase 
+          : rockScaleConfig.cluster.rockBase
+        const scale = baseScale * rng.range(rockScaleConfig.cluster.variationMin, rockScaleConfig.cluster.variationMax)
+        
+        placeObject(originalModel, normal, scale, rockMaterial)
+      }
+
+      // 放置伴生草丛 (在岩石周围)
+      for (let k = 0; k < grassInCluster; k++) {
+        if (validGrasses.length === 0) break;
+        // 减小偏移范围 (从 0.4 -> 0.25)，使草丛紧紧贴在岩石堆边缘
+        const offsetPhi = (rng.next() - 0.5) * 0.25 
+        const offsetTheta = (rng.next() - 0.5) * 0.25
+        let phi = clusterPhi + offsetPhi
+        let theta = clusterTheta + offsetTheta
+        if (phi < 0.1) phi = 0.1
+        if (phi > 1.2) phi = 1.2
+        
+        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+        const modelIndex = Math.floor(rng.range(0, validGrasses.length))
+        
+        // 组合草丛：每次随机取一个小草模型，组合成一簇
+        const subGrassCount = Math.floor(rng.range(12, 20)) // 增加数量，更茂密
+        const grassPatch = new Group()
+        
+        // 如果有草皮模型，先在底部放一个草皮作为底座
+        // 增加概率 (0.3 -> -1)，几乎 100% 生成草皮底座，填补空隙
+        if (validGrassPatches.length > 0 && rng.next() > -1) { 
+            const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
+            const patchModel = validGrassPatches[patchIndex].clone()
+            
+            // 根据模型名称调整缩放，因为原始模型尺寸差异很大
+            let patchScale = 0.02;
+            const modelName = patchModel.userData.modelName || '';
+            if (modelName.includes('grass_patch_3')) {
+              patchScale = rng.range(0.015, 0.025); // 原始尺寸很大 (~20m)
+            } else if (modelName.includes('grass_patch_2')) {
+              patchScale = rng.range(0.15, 0.25); // 原始尺寸中等 (~2.5m)
+            } else {
+              patchScale = rng.range(0.3, 0.5); // 原始尺寸较小 (~1m)
+            }
+            
+            patchModel.scale.setScalar(patchScale)
+            patchModel.rotation.y = rng.range(0, Math.PI * 2)
+            
+            // 确保草皮应用材质并可见
+            patchModel.visible = true;
+            patchModel.traverse((child) => {
+              if ((child as Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true;
+                (child as Mesh).material = grassMaterial
+                child.visible = true;
+              }
+            })
+            
+            grassPatch.add(patchModel)
+        }
+
+        for(let m=0; m<subGrassCount; m++) {
+            const grassModel = validGrasses[modelIndex].clone()
+            // 内部随机偏移 - 范围缩小，更紧密
+            const r = rng.range(0, 0.12) // 小范围偏移，紧凑
+            const angle = rng.range(0, Math.PI * 2)
+            grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
+            grassModel.rotation.y = rng.range(0, Math.PI * 2)
+            grassModel.scale.setScalar(rng.range(0.04, 0.08)) // 缩小草的大小，看起来更矮
+            grassPatch.add(grassModel)
+        }
+        
+        placeObject(grassPatch, normal, 1.0, grassMaterial)
+      }
+    }
+
+    // 2. 生成散落岩石 (Scattered) - 保持原有逻辑
+    const scatteredRockCount = 12
+    for (let k = 0; k < scatteredRockCount; k++) {
+      if (validRocks.length === 0) break;
+      const phi = rng.range(0.1, 1.1)
+      const theta = rng.range(0, Math.PI * 2)
+      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+      
+      const modelIndex = Math.floor(rng.range(0, validRocks.length))
+      const originalModel = validRocks[modelIndex]
+      const baseScale = originalModel.userData.modelName.includes('Pebble') 
+        ? rockScaleConfig.scattered.pebbleBase 
+        : rockScaleConfig.scattered.rockBase
+      const scale = baseScale * rng.range(rockScaleConfig.scattered.variationMin, rockScaleConfig.scattered.variationMax)
+      
+      placeObject(originalModel, normal, scale, rockMaterial)
+    }
+
+    // 3. 生成独立草被 (Independent Grass Patches)
+    const independentGrassCount = 20
+    for (let n = 0; n < independentGrassCount; n++) {
+      if (validGrasses.length === 0) break;
+      const phi = rng.range(0.15, 1.1)
+      const theta = rng.range(0, Math.PI * 2)
+      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+      
+      const modelIndex = Math.floor(rng.range(0, validGrasses.length))
+      
+      // 组合草丛
+      const subGrassCount = Math.floor(rng.range(15, 25)) // 独立草被更茂密
+      const grassPatch = new Group()
+      
+      // 添加草皮底座
+      if (validGrassPatches.length > 0 && rng.next() > 0.2) { // 80%概率有草皮底座
+          const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
+          const patchModel = validGrassPatches[patchIndex].clone()
+          
+          // 根据模型名称调整缩放
+          let patchScale = 0.02;
+          const modelName = patchModel.userData.modelName || '';
+          if (modelName.includes('grass_patch_3')) {
+            patchScale = rng.range(0.02, 0.03); // 原始尺寸很大
+          } else if (modelName.includes('grass_patch_2')) {
+            patchScale = rng.range(0.2, 0.3); // 原始尺寸中等
+          } else {
+            patchScale = rng.range(0.4, 0.6); // 原始尺寸较小
+          }
+
+          patchModel.scale.setScalar(patchScale) 
+          patchModel.rotation.y = rng.range(0, Math.PI * 2)
+
+          // 确保草皮应用材质并可见
+          patchModel.visible = true;
+          patchModel.traverse((child) => {
+            if ((child as Mesh).isMesh) {
+              child.castShadow = true
+              child.receiveShadow = true;
+              (child as Mesh).material = grassMaterial
+              child.visible = true;
+            }
+          })
+          
+          grassPatch.add(patchModel)
+      }
+
+      for(let m=0; m<subGrassCount; m++) {
+          const grassModel = validGrasses[Math.floor(rng.range(0, validGrasses.length))].clone()
+          const r = rng.range(0, 0.25) // 覆盖范围，紧凑
+          const angle = rng.range(0, Math.PI * 2)
+          grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
+          grassModel.rotation.y = rng.range(0, Math.PI * 2)
+          // 稍微随机化草的倾斜度，更自然
+          grassModel.rotation.x = rng.range(-0.2, 0.2)
+          grassModel.rotation.z = rng.range(-0.2, 0.2)
+          grassModel.scale.setScalar(rng.range(0.05, 0.1)) // 缩小
+          grassPatch.add(grassModel)
+      }
+      
+      placeObject(grassPatch, normal, 1.0, grassMaterial)
     }
   })
 
