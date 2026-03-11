@@ -500,7 +500,9 @@ export function createPlanetRenderer(input: {
   // 调整星球形状：通过修改几何体顶点来实现
   // 需求：上1/3部分稍微平坦，整体呈椭球状
   const positions = planetGeo.attributes.position
+  const normals = planetGeo.attributes.normal
   const v = new Vector3()
+  const n = new Vector3()
   // 基础压扁比例 (原 0.92)
   const baseScaleY = 0.92
   // 顶部额外压扁比例 (使上部更平坦)
@@ -518,8 +520,14 @@ export function createPlanetRenderer(input: {
     v.y *= yScale
     
     positions.setXYZ(i, v.x, v.y, v.z)
+
+    // 手动计算法线以修复接缝问题
+    // computeVertexNormals 会导致 UV 接缝处的法线不连续（因为顶点是分离的）
+    // 使用椭球体法线公式：(x, y/scale^2, z)
+    n.set(v.x, v.y / (yScale * yScale), v.z).normalize()
+    normals.setXYZ(i, n.x, n.y, n.z)
   }
-  planetGeo.computeVertexNormals() // 重新计算法线，这对光照和贴图至关重要
+  // planetGeo.computeVertexNormals() // 移除此行，避免破坏接缝处的法线连续性
 
   refs.planetMesh = new Mesh(planetGeo, mats.planet)
   refs.planetMesh.castShadow = true
