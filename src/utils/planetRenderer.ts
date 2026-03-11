@@ -1,147 +1,41 @@
 import {
-  AmbientLight,
   BufferGeometry,
-  CanvasTexture,
   Color,
-  ConeGeometry,
-  CylinderGeometry,
-  DirectionalLight,
   DodecahedronGeometry,
   Float32BufferAttribute,
   FogExp2,
   Group,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
-  PCFSoftShadowMap,
   PerspectiveCamera,
-  PlaneGeometry,
   Points,
   PointsMaterial,
-  Quaternion,
-  RepeatWrapping, // 添加 RepeatWrapping
-  RingGeometry,
+  PCFSoftShadowMap, // 添加 PCFSoftShadowMap
+  RepeatWrapping,
   Scene,
   SphereGeometry,
-  SpotLight,
   SRGBColorSpace,
+  TextureLoader,
   Vector3,
   WebGLRenderer,
-  BoxGeometry,
-  TextureLoader,
-  Vector2,
-  Raycaster,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { TIFFLoader } from 'three/examples/jsm/loaders/TIFFLoader.js'
 
-export type VegetationConfig = {
-  grass: number
-  flowers: number
-  bushes: number
-  trees: number
-}
-
-export type Stage = {
-  threshold: number
-  vegetation: VegetationConfig
-}
-
-// --- 辅助函数：纹理生成 ---
-// 使用 Canvas 2D 生成噪点纹理，用于给 3D 物体增加粗糙质感
-function createNoiseTexture(baseColorHex: string, noiseAmount = 15) {
-  const size = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas 2D context unavailable')
-  ctx.fillStyle = baseColorHex
-  ctx.fillRect(0, 0, size, size)
-
-  const img = ctx.getImageData(0, 0, size, size)
-  for (let i = 0; i < img.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * noiseAmount
-    img.data[i] = Math.max(0, Math.min(255, img.data[i]! + n))
-    img.data[i + 1] = Math.max(0, Math.min(255, img.data[i + 1]! + n))
-    img.data[i + 2] = Math.max(0, Math.min(255, img.data[i + 2]! + n))
-  }
-  ctx.putImageData(img, 0, 0)
-
-  const tex = new CanvasTexture(canvas)
-  tex.colorSpace = SRGBColorSpace
-  tex.wrapS = RepeatWrapping
-  tex.wrapT = RepeatWrapping
-  tex.needsUpdate = true
-  return tex
-}
+import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
+import { mats } from './planet/assets/Materials'
+import { setupLights } from './planet/core/Lights'
 
 const PLANET_RADIUS_BASE = 3.0
 
-function getSurfaceTransform(normal: any, radius: number) {
-  const pos = normal.clone().multiplyScalar(radius)
-  const up = new Vector3(0, 1, 0)
-  const quaternion = new Quaternion()
-  quaternion.setFromUnitVectors(up, normal)
-
-  return { pos, quaternion }
-}
-
 // --- 纹理加载 ---
 const textureLoader = new TextureLoader()
-const exrLoader = new EXRLoader()
 const gltfLoader = new GLTFLoader()
 const tiffLoader = new TIFFLoader()
 
-// 简单的种子随机数生成器，确保每次生成的位置一致
-class SeededRandom {
-  private seed: number;
-  constructor(seed: number) {
-    this.seed = seed;
-  }
-  // 0 to 1
-  next() {
-    this.seed = (this.seed * 9301 + 49297) % 233280;
-    return this.seed / 233280;
-  }
-  // min to max
-  range(min: number, max: number) {
-    return min + this.next() * (max - min);
-  }
-}
-
 // --- 材质定义 ---
-const mats = {
-  planet: new MeshStandardMaterial({
-    // map 和 displacementMap 将在 TIFF 加载完成后设置
-    displacementScale: 0.3, // 凹凸程度，根据需要微调
-    color: 0xC4A484, // 浅褐棕色 (Light Brown / Sandy Brown)
-    roughness: 1.0, // 范围0-0.1
-    normalScale: new Vector2(1.5, 1.5),
-  }),
-  grass: new MeshStandardMaterial({ map: createNoiseTexture('#6b7045', 20), roughness: 0.9 }),
-  houseBody: new MeshStandardMaterial({ map: createNoiseTexture('#f5deb3', 10), roughness: 0.8 }),
-  houseRoof: new MeshStandardMaterial({ map: createNoiseTexture('#e07a5f', 20), roughness: 0.7 }),
-  door: new MeshStandardMaterial({ color: 0x8b4513 }),
-  window: new MeshStandardMaterial({ color: 0x444444, emissive: 0x000000 }),
-  trunk: new MeshStandardMaterial({ map: createNoiseTexture('#5a3a2a', 40), roughness: 1.0 }),
-  leaves1: new MeshStandardMaterial({ color: 0x88dd88, roughness: 0.9, flatShading: true }),
-  leaves2: new MeshStandardMaterial({ color: 0x55aa55, roughness: 0.9, flatShading: true }),
-  rabbit: new MeshStandardMaterial({ color: 0xffb7b2, roughness: 0.7 }),
-  bear: new MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 }),
-  rock: new MeshStandardMaterial({ color: 0x808080, roughness: 0.9 }),
-  ring: new MeshStandardMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.4,
-    side: 2,
-    roughness: 0.5,
-    metalness: 0.1,
-  }),
-  blade: new MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }),
-}
+// mats 已提取到 ./planet/assets/Materials
 
 // 异步加载 TIFF 贴图
 tiffLoader.load('/textures/lroc_color_16bit_srgb_4k.tif', (texture) => {
@@ -173,227 +67,16 @@ function createStars() {
   return new Points(starGeo, material)
 }
 
-// 创建一棵树（树干 + 树叶）
-function createOrganicTree(scale = 1.0) {
-  const group = new Group()
-  const trunkHeight = 0.8 * scale
-  const trunkGeo = new CylinderGeometry(0.06 * scale, 0.12 * scale, trunkHeight, 7)
-  trunkGeo.translate(0, trunkHeight / 2, 0)
-  const trunk = new Mesh(trunkGeo, mats.trunk)
-  trunk.castShadow = true
-  trunk.receiveShadow = true
-  trunk.rotation.x = (Math.random() - 0.5) * 0.2
-  trunk.rotation.z = (Math.random() - 0.5) * 0.2
-  group.add(trunk)
-
-  const foliageGroup = new Group()
-  foliageGroup.position.y = trunkHeight * 0.9
-  const mainSize = 0.5 * scale
-  const mainLeaf = new Mesh(new DodecahedronGeometry(mainSize, 0), mats.leaves1)
-  mainLeaf.castShadow = true
-  mainLeaf.receiveShadow = true
-  foliageGroup.add(mainLeaf)
-
-  const subLeafCount = 4 + Math.floor(Math.random() * 3)
-  const subGeo = new DodecahedronGeometry(mainSize * 0.6, 0)
-  for (let i = 0; i < subLeafCount; i++) {
-    const mat = Math.random() > 0.5 ? mats.leaves1 : mats.leaves2
-    const mesh = new Mesh(subGeo, mat)
-    const theta = Math.random() * Math.PI * 2
-    const phi = Math.random() * Math.PI
-    const r = mainSize * 0.7
-    mesh.position.set(
-      r * Math.sin(phi) * Math.cos(theta),
-      r * Math.cos(phi) * 0.8 + 0.1,
-      r * Math.sin(phi) * Math.sin(theta),
-    )
-    mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3)
-    mesh.castShadow = true
-    mesh.receiveShadow = true
-    foliageGroup.add(mesh)
-  }
-  group.add(foliageGroup)
-  return group
-}
-
-// 创建生态地块（包含树、石头、草丛）
-function createEcosystemPatch(scale = 1.0) {
-  const group = new Group()
-  const tree = createOrganicTree(1.0)
-  group.add(tree)
-
-  const rockCount = 2 + Math.floor(Math.random() * 2)
-  const rockGeo = new DodecahedronGeometry(0.2, 0)
-  for (let i = 0; i < rockCount; i++) {
-    const rock = new Mesh(rockGeo, mats.rock)
-    const r = 0.4 + Math.random() * 0.4
-    const theta = Math.random() * Math.PI * 2
-    rock.position.set(r * Math.cos(theta), 0.1, r * Math.sin(theta))
-    rock.scale.setScalar(0.5 + Math.random() * 0.5)
-    rock.rotation.set(Math.random(), Math.random(), Math.random())
-    rock.castShadow = true
-    group.add(rock)
-  }
-
-  const grassCount = 3 + Math.floor(Math.random() * 3)
-  const bladeGeo = new ConeGeometry(0.05, 0.2, 3)
-  bladeGeo.translate(0, 0.1, 0)
-  for (let i = 0; i < grassCount; i++) {
-    const grassTuft = new Group()
-    for (let k = 0; k < 3; k++) {
-      const blade = new Mesh(bladeGeo, mats.leaves1)
-      blade.rotation.x = (Math.random() - 0.5) * 0.5
-      blade.rotation.z = (Math.random() - 0.5) * 0.5
-      blade.position.x = (Math.random() - 0.5) * 0.05
-      grassTuft.add(blade)
-    }
-    const r = 0.5 + Math.random() * 0.5
-    const theta = Math.random() * Math.PI * 2
-    grassTuft.position.set(r * Math.cos(theta), 0, r * Math.sin(theta))
-    grassTuft.rotation.y = Math.random() * Math.PI
-    group.add(grassTuft)
-  }
-  return group
-}
-
-// 创建房子
-function createCompactHouse(refs: any) {
-  const group = new Group()
-  const scale = 1.0
-  const bodyH = 0.8 * scale
-  const bodyW = 1.1 * scale
-  const bodyGeo = new BoxGeometry(bodyW, bodyH, bodyW)
-  bodyGeo.translate(0, bodyH / 2, 0)
-  const body = new Mesh(bodyGeo, mats.houseBody)
-  body.castShadow = true
-  body.receiveShadow = true
-  group.add(body)
-
-  const roofH = 0.8 * scale
-  const roofW = 1.0 * scale
-  const roofGeo = new ConeGeometry(roofW, roofH, 4)
-  roofGeo.translate(0, roofH / 2, 0)
-  const roof = new Mesh(roofGeo, mats.houseRoof)
-  roof.position.y = bodyH - 0.1
-  roof.rotation.y = Math.PI / 4
-  roof.castShadow = true
-  roof.receiveShadow = true
-  group.add(roof)
-
-  const chimGeo = new BoxGeometry(0.25 * scale, 0.4 * scale, 0.25 * scale)
-  const chim = new Mesh(chimGeo, mats.door)
-  chim.position.set(0.3 * scale, bodyH + 0.3 * scale, -0.2 * scale)
-  chim.castShadow = true
-  group.add(chim)
-
-  const doorGeo = new PlaneGeometry(0.35 * scale, 0.5 * scale)
-  const door = new Mesh(doorGeo, mats.door)
-  door.position.set(0, 0.3 * scale, bodyW / 2 + 0.01)
-  group.add(door)
-
-  // 窗户 (需要保存引用以控制发光)
-  const winGeo = new PlaneGeometry(0.3 * scale, 0.3 * scale)
-  refs.windowMesh = new Mesh(winGeo, mats.window)
-  refs.windowMesh.position.set(0.61 * scale, 0.5 * scale, 0)
-  refs.windowMesh.rotation.y = Math.PI / 2
-  group.add(refs.windowMesh)
-
-  return group
-}
-
-// 创建风车
-function createWindmill() {
-  const group = new Group()
-  const scale = 1.2
-  const tower = new Mesh(new CylinderGeometry(0.15 * scale, 0.3 * scale, 1.5 * scale, 8), mats.houseBody)
-  tower.position.y = 0.75 * scale
-  tower.castShadow = true
-  tower.receiveShadow = true
-  group.add(tower)
-
-  const roof = new Mesh(new ConeGeometry(0.25 * scale, 0.5 * scale, 8), mats.houseRoof)
-  roof.position.y = 1.5 * scale + 0.25 * scale
-  roof.castShadow = true
-  group.add(roof)
-
-  const rotorGroup = new Group()
-  rotorGroup.position.set(0, 1.3 * scale, 0.2 * scale)
-  rotorGroup.rotation.x = -0.1
-  const hub = new Mesh(new CylinderGeometry(0.05 * scale, 0.05 * scale, 0.2 * scale, 8, 1, false, 0, Math.PI * 2), mats.door)
-  hub.rotation.x = Math.PI / 2
-  rotorGroup.add(hub)
-
-  const bladeGeo = new BoxGeometry(0.15 * scale, 1.2 * scale, 0.02 * scale)
-  bladeGeo.translate(0, 0.6 * scale, 0)
-  for (let i = 0; i < 4; i++) {
-    const blade = new Mesh(bladeGeo, mats.blade)
-    blade.rotation.z = i * (Math.PI / 2)
-    blade.castShadow = true
-    rotorGroup.add(blade)
-  }
-  group.add(rotorGroup)
-
-  const rockGeo = new DodecahedronGeometry(0.15 * scale, 0)
-  for (let i = 0; i < 3; i++) {
-    const rock = new Mesh(rockGeo, mats.rock)
-    const angle = Math.random() * Math.PI * 2
-    const r = 0.4 * scale
-    rock.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r)
-    group.add(rock)
-  }
-  return { group, rotor: rotorGroup }
-}
-
-// 创建角色 (兔子或熊)
-function createCuteCharacter(type: 'rabbit' | 'bear') {
-  const group = new Group()
-  const scale = 0.8
-  const mat = type === 'rabbit' ? mats.rabbit : mats.bear
-  const bodyRadius = 0.45 * scale
-  const bodyGeo = new SphereGeometry(bodyRadius, 16, 16)
-  bodyGeo.translate(0, bodyRadius, 0)
-  const body = new Mesh(bodyGeo, mat)
-  body.castShadow = true
-  group.add(body)
-
-  const headRadius = 0.4 * scale
-  const headGeo = new SphereGeometry(headRadius, 16, 16)
-  const head = new Mesh(headGeo, mat)
-  head.position.y = bodyRadius * 1.6
-  head.castShadow = true
-  group.add(head)
-
-  if (type === 'rabbit') {
-    const earGeo = new CylinderGeometry(0.1 * scale, 0.1 * scale, 0.6 * scale, 8)
-    const ear1 = new Mesh(earGeo, mat)
-    ear1.position.set(-0.2 * scale, head.position.y + 0.4 * scale, 0)
-    ear1.rotation.z = -0.2
-    group.add(ear1)
-    const ear2 = ear1.clone()
-    ear2.position.set(0.2 * scale, head.position.y + 0.4 * scale, 0)
-    ear2.rotation.z = 0.2
-    group.add(ear2)
-  } else {
-    const earGeo = new SphereGeometry(0.15 * scale, 8, 8)
-    const ear1 = new Mesh(earGeo, mat)
-    ear1.position.set(-0.35 * scale, head.position.y + 0.3 * scale, 0)
-    group.add(ear1)
-    const ear2 = ear1.clone()
-    ear2.position.set(0.35 * scale, head.position.y + 0.3 * scale, 0)
-    group.add(ear2)
-  }
-  return group
-}
-
 // --- 核心渲染器 ---
 
 export function createPlanetRenderer(input: {
-  host: HTMLDivElement
   canvas: HTMLCanvasElement
-  stages: Stage[]
-  stageIndex: number
+  dayCount: number
+  timeOfDay?: number
 }) {
-  const { host, canvas } = input
+  const { canvas, dayCount: initialDayCount, timeOfDay = 12 } = input
+  const host = canvas.parentElement as HTMLDivElement
+  let dayCount = initialDayCount
 
   // 引用对象 (Refs) 用于存储需要更新的场景物体
   const refs: any = {
@@ -416,14 +99,10 @@ export function createPlanetRenderer(input: {
     particles: [],
   }
 
-  // 内部状态
-  let dayCount = 0
-
   // --- 初始化场景 ---
   const scene = new Scene()
   scene.background = new Color('#050510')
   scene.fog = new FogExp2(0x050510, 0.04)
-
   const camera = new PerspectiveCamera(50, 1, 0.1, 100)
   camera.position.set(0, 4, 12)
 
@@ -447,42 +126,10 @@ export function createPlanetRenderer(input: {
   controls.minPolarAngle = Math.PI / 3 // 限制最小视角，防止完全俯视
   controls.enablePan = false // 禁止平移，保持星球在中心
   // controls.minAzimuthAngle = -Infinity // 允许水平无限旋转
-  // controls.maxAzimuthAngle = Infinity
 
   // --- 初始化灯光 ---
-  // 环境光
-  refs.lights.ambient = new AmbientLight(0xfff4e5, 0.18) // 降低环境光，增加明暗对比
-  scene.add(refs.lights.ambient)
-
-  // 主光/正光 (模拟太阳)
-  refs.lights.sun = new DirectionalLight(0xffce84, 6.5) // 更接近日光的暖白色
-  refs.lights.sun.position.set(-10, 12, -1) // 从左上方照射
-  refs.lights.sun.castShadow = true
-  refs.lights.sun.shadow.mapSize.width = 2048
-  refs.lights.sun.shadow.mapSize.height = 2048
-  refs.lights.sun.shadow.bias = -0.0001
-  scene.add(refs.lights.sun)
-
-  // 辅光/侧光 (模拟环境反射/星光)
-  refs.lights.moon = new DirectionalLight(0x4466cc, 0.55) // 冷色辅光，照亮暗部
-  refs.lights.moon.position.set(5, 10, 5)  // 从左侧照射
-  scene.add(refs.lights.moon)
-
-  // 边缘光/轮廓光 (逆光)
-  const rimLight = new DirectionalLight(0x4488ff, 0.9) // 强烈的冷色轮廓光
-  rimLight.position.set(0, 5, -10) // 从正后上方照射
-  scene.add(rimLight)
-
-  // 焦点光 (左上角高光)
-  const spotLight = new SpotLight(0xffffff, 200.0) // 增强强度以弥补范围缩小
-  spotLight.position.set(-6, 8, 4) // 调整位置，使其更靠近左侧上方
-  spotLight.angle = Math.PI / 10 // 更窄的角度 (15度)，使光束更集中
-  spotLight.penumbra = 0.3 // 边缘稍微硬一点  0.0 到 1.0
-  spotLight.decay = 2 // 物理衰减 
-  spotLight.distance = 50
-  spotLight.target.position.set(0, 0, 0) // 指向星球中心
-  scene.add(spotLight)
-  scene.add(spotLight.target)
+  const lights = setupLights(scene)
+  Object.assign(refs.lights, lights)
 
   refs.starsPoints = createStars()
   scene.add(refs.starsPoints)
@@ -527,7 +174,6 @@ export function createPlanetRenderer(input: {
     n.set(v.x, v.y / (yScale * yScale), v.z).normalize()
     normals.setXYZ(i, n.x, n.y, n.z)
   }
-  // planetGeo.computeVertexNormals() // 移除此行，避免破坏接缝处的法线连续性
 
   refs.planetMesh = new Mesh(planetGeo, mats.planet)
   refs.planetMesh.castShadow = true
@@ -535,37 +181,6 @@ export function createPlanetRenderer(input: {
   // 移除之前的缩放，现在形状已经烘焙到几何体中了
   refs.planetMesh.scale.set(1, 1, 1)
   planetGroup.add(refs.planetMesh)
-
-  // 辅助函数：获取星球表面坐标和旋转（支持非均匀缩放）
-  // 修正：由于 displacementScale 设置为 0.3，导致地表高度增加，物体需要相应提升高度
-  // DisplacementMap 默认会向外挤出，最大挤出量约为 displacementScale
-  // 我们取一个较小值，宁可让物体稍微陷入地下（自然），也不要悬空（穿帮）
-  const surfaceOffset = 0.05; 
-
-  const getSurfaceTransform = (normal: Vector3, radius: number) => {
-    // 1. 计算变形后的表面点
-    // 先获取标准球体上的点 (radius + surfaceOffset 确保在地面之上)
-    const pos = normal.clone().normalize().multiplyScalar(radius + surfaceOffset)
-    
-    // 应用与几何体相同的变形逻辑
-    let yScale = baseScaleY
-    if (pos.y > 0) {
-      yScale *= topFlattenScale
-    }
-    pos.y *= yScale
-    
-    // 2. 计算该点的切面法线
-    // 对于缩放球体 (x, y*s, z)，法线是 (x, y/s, z)
-    // 这里 s = yScale
-    const surfaceNormal = new Vector3(pos.x, pos.y / (yScale * yScale), pos.z).normalize()
-    
-    const quaternion = new Quaternion()
-    quaternion.setFromUnitVectors(new Vector3(0, 1, 0), surfaceNormal)
-    
-    return { pos, quaternion }
-  }
-
-
 
   const grassGeo = new SphereGeometry(grassRadius, 128, 128)
 
@@ -589,13 +204,10 @@ export function createPlanetRenderer(input: {
     '/models/Grass_Wispy_Short.gltf',
     '/models/Grass_Wispy_Tall.gltf',
   ]
-  
   const grassPatchModels: string[] = [
     '/models/grass_patch.gltf',
     '/models/grass_patch_2.gltf',
-    // '/models/grass_patch_3.gltf', // 移除：形状偏正方形，不自然
   ]
-  
   const flowerModels: string[] = [
     '/models/Flower_3_Single.gltf',
     '/models/Flower_4_Single.gltf',
@@ -683,27 +295,6 @@ export function createPlanetRenderer(input: {
     const validFlowers = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'flower')
     
     if (validRocks.length === 0 && validGrasses.length === 0 && validGrassPatches.length === 0 && validFlowers.length === 0) return
-
-    // 材质定义
-    const rockMaterial = new MeshStandardMaterial({
-      color: 0x8b7e66, // 泥土色
-      roughness: 0.9,
-      flatShading: true
-    });
-    
-    const grassMaterial = new MeshStandardMaterial({
-      color: 0x7e885d, // 苔藓绿 (Moss Green) - 枯黄与暗绿的中间色
-      roughness: 0.9,
-      flatShading: true,
-      side: 2 // DoubleSide
-    });
-
-    const flowerPetalMaterial = new MeshStandardMaterial({
-      color: 0x195cac, // 蓝紫色 (Blue Violet)
-      roughness: 0.8,
-      flatShading: true,
-      side: 2
-    });
     
     // 辅助函数：放置单个物体
     const placeObject = (obj: Object3D, normal: Vector3, scale: number, material: any) => {
@@ -755,7 +346,7 @@ export function createPlanetRenderer(input: {
           : rockScaleConfig.cluster.rockBase
         const scale = baseScale * rng.range(rockScaleConfig.cluster.variationMin, rockScaleConfig.cluster.variationMax)
         
-        placeObject(originalModel, normal, scale, rockMaterial)
+        placeObject(originalModel, normal, scale, mats.rockInstanced)
       }
 
       // 放置伴生草丛 (在岩石周围)
@@ -783,106 +374,26 @@ export function createPlanetRenderer(input: {
             const patchModel = validGrassPatches[patchIndex].clone()
             
             // 根据模型名称调整缩放，因为原始模型尺寸差异很大
-            let patchScale = 0.02;
-            const modelName = patchModel.userData.modelName || '';
-            if (modelName.includes('grass_patch_3')) {
-              patchScale = rng.range(0.015, 0.025); // 原始尺寸很大 (~20m)
-            } else if (modelName.includes('grass_patch_2')) {
-              patchScale = rng.range(0.15, 0.25); // 原始尺寸中等 (~2.5m)
-            } else {
-              patchScale = rng.range(0.3, 0.5); // 原始尺寸较小 (~1m)
-            }
-            
-            patchModel.scale.setScalar(patchScale)
-            patchModel.rotation.y = rng.range(0, Math.PI * 2)
-            
-            // 确保草皮应用材质并可见
-            patchModel.visible = true;
-            patchModel.traverse((child) => {
-              if ((child as Mesh).isMesh) {
-                child.castShadow = true
-                child.receiveShadow = true;
-                (child as Mesh).material = grassMaterial
-                child.visible = true;
-              }
-            })
-            
-            grassPatch.add(patchModel)
-        }
-
-        for(let m=0; m<subGrassCount; m++) {
-            const grassModel = validGrasses[modelIndex].clone()
-            // 内部随机偏移 - 范围缩小，更紧密
-            const r = rng.range(0, 0.12) // 小范围偏移，紧凑
-            const angle = rng.range(0, Math.PI * 2)
-            grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
-            grassModel.rotation.y = rng.range(0, Math.PI * 2)
-            grassModel.scale.setScalar(rng.range(0.04, 0.08)) // 缩小草的大小，看起来更矮
-            grassPatch.add(grassModel)
-        }
-        
-        placeObject(grassPatch, normal, 1.0, grassMaterial)
-      }
-    }
-
-    // 2. 生成散落岩石 (Scattered) - 保持原有逻辑
-    const scatteredRockCount = 12
-    for (let k = 0; k < scatteredRockCount; k++) {
-      if (validRocks.length === 0) break;
-      const phi = rng.range(0.1, 1.1)
-      const theta = rng.range(0, Math.PI * 2)
-      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-      
-      const modelIndex = Math.floor(rng.range(0, validRocks.length))
-      const originalModel = validRocks[modelIndex]
-      const baseScale = originalModel.userData.modelName.includes('Pebble') 
-        ? rockScaleConfig.scattered.pebbleBase 
-        : rockScaleConfig.scattered.rockBase
-      const scale = baseScale * rng.range(rockScaleConfig.scattered.variationMin, rockScaleConfig.scattered.variationMax)
-      
-      placeObject(originalModel, normal, scale, rockMaterial)
-    }
-
-    // 3. 生成独立草被 (Independent Grass Patches)
-    const independentGrassCount = 20
-    for (let n = 0; n < independentGrassCount; n++) {
-      if (validGrasses.length === 0) break;
-      const phi = rng.range(0.15, 1.1)
-      const theta = rng.range(0, Math.PI * 2)
-      const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-      
-      const modelIndex = Math.floor(rng.range(0, validGrasses.length))
-      
-      // 组合草丛
-      const subGrassCount = Math.floor(rng.range(15, 25)) // 独立草被更茂密
-      const grassPatch = new Group()
-      
-      // 添加草皮底座
-      if (validGrassPatches.length > 0 && rng.next() > 0.2) { // 80%概率有草皮底座
-          const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
-          const patchModel = validGrassPatches[patchIndex].clone()
-          
-          // 根据模型名称调整缩放
           let patchScale = 0.02;
           const modelName = patchModel.userData.modelName || '';
           if (modelName.includes('grass_patch_3')) {
-            patchScale = rng.range(0.02, 0.03); // 原始尺寸很大
+            patchScale = rng.range(0.015, 0.025); // 原始尺寸很大 (~20m)
           } else if (modelName.includes('grass_patch_2')) {
-            patchScale = rng.range(0.2, 0.3); // 原始尺寸中等
+            patchScale = rng.range(0.15, 0.25); // 原始尺寸中等 (~2.5m)
           } else {
-            patchScale = rng.range(0.4, 0.6); // 原始尺寸较小
+            patchScale = rng.range(0.3, 0.5); // 原始尺寸较小 (~1m)
           }
-
-          patchModel.scale.setScalar(patchScale) 
+          
+          patchModel.scale.setScalar(patchScale)
           patchModel.rotation.y = rng.range(0, Math.PI * 2)
-
+          
           // 确保草皮应用材质并可见
           patchModel.visible = true;
           patchModel.traverse((child) => {
             if ((child as Mesh).isMesh) {
               child.castShadow = true
               child.receiveShadow = true;
-              (child as Mesh).material = grassMaterial
+              (child as Mesh).material = mats.grassInstanced
               child.visible = true;
             }
           })
@@ -891,20 +402,100 @@ export function createPlanetRenderer(input: {
       }
 
       for(let m=0; m<subGrassCount; m++) {
-          const grassModel = validGrasses[Math.floor(rng.range(0, validGrasses.length))].clone()
-          const r = rng.range(0, 0.25) // 覆盖范围，紧凑
+          const grassModel = validGrasses[modelIndex].clone()
+          // 内部随机偏移 - 范围缩小，更紧密
+          const r = rng.range(0, 0.12) // 小范围偏移，紧凑
           const angle = rng.range(0, Math.PI * 2)
           grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
           grassModel.rotation.y = rng.range(0, Math.PI * 2)
-          // 稍微随机化草的倾斜度，更自然
-          grassModel.rotation.x = rng.range(-0.2, 0.2)
-          grassModel.rotation.z = rng.range(-0.2, 0.2)
-          grassModel.scale.setScalar(rng.range(0.05, 0.1)) // 缩小
+          grassModel.scale.setScalar(rng.range(0.04, 0.08)) // 缩小草的大小，看起来更矮
           grassPatch.add(grassModel)
       }
       
-      placeObject(grassPatch, normal, 1.0, grassMaterial)
+      placeObject(grassPatch, normal, 1.0, mats.grassInstanced)
     }
+  }
+
+  // 2. 生成散落岩石 (Scattered) - 保持原有逻辑
+  const scatteredRockCount = 12
+  for (let k = 0; k < scatteredRockCount; k++) {
+    if (validRocks.length === 0) break;
+    const phi = rng.range(0.1, 1.1)
+    const theta = rng.range(0, Math.PI * 2)
+    const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+    
+    const modelIndex = Math.floor(rng.range(0, validRocks.length))
+    const originalModel = validRocks[modelIndex]
+    const baseScale = originalModel.userData.modelName.includes('Pebble') 
+      ? rockScaleConfig.scattered.pebbleBase 
+      : rockScaleConfig.scattered.rockBase
+    const scale = baseScale * rng.range(rockScaleConfig.scattered.variationMin, rockScaleConfig.scattered.variationMax)
+    
+    placeObject(originalModel, normal, scale, mats.rockInstanced)
+  }
+
+  // 3. 生成独立草被 (Independent Grass Patches)
+  const independentGrassCount = 20
+  for (let n = 0; n < independentGrassCount; n++) {
+    if (validGrasses.length === 0) break;
+    const phi = rng.range(0.15, 1.1)
+    const theta = rng.range(0, Math.PI * 2)
+    const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+    
+    const modelIndex = Math.floor(rng.range(0, validGrasses.length))
+    
+    // 组合草丛
+    const subGrassCount = Math.floor(rng.range(15, 25)) // 独立草被更茂密
+    const grassPatch = new Group()
+    
+    // 添加草皮底座
+    if (validGrassPatches.length > 0 && rng.next() > 0.2) { // 80%概率有草皮底座
+        const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
+        const patchModel = validGrassPatches[patchIndex].clone()
+        
+        // 根据模型名称调整缩放
+        let patchScale = 0.02;
+        const modelName = patchModel.userData.modelName || '';
+        if (modelName.includes('grass_patch_3')) {
+          patchScale = rng.range(0.02, 0.03); // 原始尺寸很大
+        } else if (modelName.includes('grass_patch_2')) {
+          patchScale = rng.range(0.2, 0.3); // 原始尺寸中等
+        } else {
+          patchScale = rng.range(0.4, 0.6); // 原始尺寸较小
+        }
+
+        patchModel.scale.setScalar(patchScale) 
+        patchModel.rotation.y = rng.range(0, Math.PI * 2)
+
+        // 确保草皮应用材质并可见
+        patchModel.visible = true;
+        patchModel.traverse((child) => {
+          if ((child as Mesh).isMesh) {
+            child.castShadow = true
+            child.receiveShadow = true;
+            (child as Mesh).material = mats.grassInstanced
+            child.visible = true;
+          }
+        })
+        
+        grassPatch.add(patchModel)
+    }
+
+    for(let m=0; m<subGrassCount; m++) {
+        const grassModel = validGrasses[Math.floor(rng.range(0, validGrasses.length))].clone()
+        const r = rng.range(0, 0.25) // 覆盖范围，紧凑
+        const angle = rng.range(0, Math.PI * 2)
+        grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
+        grassModel.rotation.y = rng.range(0, Math.PI * 2)
+        // 稍微随机化草的倾斜度，更自然
+        grassModel.rotation.x = rng.range(-0.2, 0.2)
+        grassModel.rotation.z = rng.range(-0.2, 0.2)
+        grassModel.scale.setScalar(rng.range(0.05, 0.1)) // 缩小
+        grassPatch.add(grassModel)
+    }
+    
+    placeObject(grassPatch, normal, 1.0, mats.grassInstanced)
+  }
 
     // 4. 生成花朵 (Flowers) - 上1/5区域
     const flowerCount = 4
@@ -924,7 +515,6 @@ export function createPlanetRenderer(input: {
       const modelIndex = Math.floor(rng.range(0, validFlowers.length))
       const originalModel = validFlowers[modelIndex].clone()
       
-      // 花朵需要稍微大一点才能看清
       // --- 如何调节花朵大小 ---
       // 修改这里的 rng.range(最小值, 最大值) 参数
       // 目前是 0.08 到 0.12，数值越大，花朵越大
@@ -960,21 +550,21 @@ export function createPlanetRenderer(input: {
           const matName = (child as Mesh).material && ((child as Mesh).material as any).name ? ((child as Mesh).material as any).name.toLowerCase() : '';
           
           if (matName.includes('flower') || matName.includes('petal')) {
-             (child as Mesh).material = flowerPetalMaterial
+             (child as Mesh).material = mats.flowerPetal
           } else {
              // 茎叶使用草的材质
-             (child as Mesh).material = grassMaterial
+             (child as Mesh).material = mats.grassInstanced
           }
         }
       })
       rocksGroup.add(clone)
     }
-  })
-
+  }).catch(err => {
+    console.error("Error in loading models or placing objects:", err);
+  });
 
   // 更新视觉元素：根据天数控制物体的显示/隐藏和缩放
   function updateVisuals() {
-    // 触发一次时间更新，确保窗户灯光状态正确
     // updateTimeOfDay(timeOfDay)
   }
 
@@ -983,38 +573,40 @@ export function createPlanetRenderer(input: {
     const geo = new DodecahedronGeometry(0.1, 0)
     const mat = new MeshBasicMaterial({ color: 0xffdd44 })
     const mesh = new Mesh(geo, mat)
-    const angle = Math.random() * Math.PI * 2
-    const r = 3.5
-    mesh.position.set(
-      Math.cos(angle) * r,
-      (Math.random() - 0.5) * 4,
-      Math.sin(angle) * r,
-    )
-    mesh.userData.velocity = new Vector3(
-      (Math.random() - 0.5) * 0.1,
-      0.1 + Math.random() * 0.1,
-      (Math.random() - 0.5) * 0.1,
-    )
-    mesh.userData.life = 1.0
+    
+    // 随机位置（在星球表面附近）
+    const phi = Math.random() * Math.PI
+    const theta = Math.random() * Math.PI * 2
+    const { pos } = getSurfaceTransform(new Vector3().setFromSphericalCoords(1, phi, theta), PLANET_RADIUS_BASE)
+    mesh.position.copy(pos.multiplyScalar(1.05)) // 稍微飞起来一点
+    
     scene.add(mesh)
-    refs.particles.push(mesh)
+    refs.particles.push(Object.assign(mesh, {
+      userData: {
+        velocity: new Vector3((Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05),
+        life: 1.0
+      }
+    }))
   }
 
-  // 触发点击时的震动和粒子效果
   function triggerClickFeedback() {
-    if (refs.planetGroup) refs.planetGroup.scale.set(1.02, 1.02, 1.02)
-    for (let i = 0; i < 5; i++) createParticle()
+    for(let i=0; i<5; i++) createParticle()
+    // 简单的弹跳动画
+    if (refs.planetGroup) {
+      refs.planetGroup.scale.set(1.05, 1.05, 1.05)
+    }
   }
 
-  // --- 动画循环 ---
-  let rafId: number | null = null
-  const loop = () => {
+  let rafId: number
+  function loop() {
     rafId = window.requestAnimationFrame(loop)
     controls.update()
 
-    // 星球自转
-    if (refs.planetGroup) {
-      refs.planetGroup.rotation.y += 0.002
+    // 简单的自转
+    planetGroup.rotation.y += 0.0005
+
+    // 简单的回弹动画
+    if (refs.planetGroup && refs.planetGroup.scale.x > 1.001) {
       refs.planetGroup.scale.lerp(new Vector3(1, 1, 1), 0.1)
     }
 
