@@ -41,5 +41,6 @@ __screenshots__/
 # 忽略特定文件
 public/gemini_xq - 副本.html
 
-# 忽略 Trae AI 生成的文档
 .trae/
+.claude/
+note.md
