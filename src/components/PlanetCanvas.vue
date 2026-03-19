@@ -43,6 +43,7 @@ onMounted(() => {
   renderer = createPlanetRenderer({
     host: hostEl,
     canvas: canvasEl,
+    dayCount: props.dayCount,
     stages: props.stages,
     stageIndex: props.stageIndex,
   })

@@ -7,6 +7,7 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   PerspectiveCamera,
   Points,
   PointsMaterial,
@@ -26,6 +27,8 @@ import { TIFFLoader } from 'three/examples/jsm/loaders/TIFFLoader.js'
 import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
+
+export type { Stage } from './planet/types'
 
 const PLANET_RADIUS_BASE = 3.0
 
@@ -70,12 +73,15 @@ function createStars() {
 // --- 核心渲染器 ---
 
 export function createPlanetRenderer(input: {
+  host?: HTMLDivElement
   canvas: HTMLCanvasElement
   dayCount: number
   timeOfDay?: number
+  stages?: unknown
+  stageIndex?: number
 }) {
   const { canvas, dayCount: initialDayCount, timeOfDay = 12 } = input
-  const host = canvas.parentElement as HTMLDivElement
+  const host = input.host ?? (canvas.parentElement as HTMLDivElement)
   let dayCount = initialDayCount
 
   // 引用对象 (Refs) 用于存储需要更新的场景物体
@@ -155,24 +161,28 @@ export function createPlanetRenderer(input: {
   // 顶部额外压扁比例 (使上部更平坦)
   const topFlattenScale = 0.80 
 
-  for (let i = 0; i < positions.count; i++) {
-    v.fromBufferAttribute(positions, i)
-    
-    let yScale = baseScaleY
-    // 对上半球应用额外的压扁，模拟"顶部平坦"的效果
-    // 使用平滑过渡以避免接缝，虽然 y>0 硬切也行，但平滑更好
-    if (v.y > 0) {
-      yScale *= topFlattenScale
-    }
-    v.y *= yScale
-    
-    positions.setXYZ(i, v.x, v.y, v.z)
+  if (positions && normals) {
+    for (let i = 0; i < positions.count; i++) {
+      v.fromBufferAttribute(positions, i)
 
-    // 手动计算法线以修复接缝问题
-    // computeVertexNormals 会导致 UV 接缝处的法线不连续（因为顶点是分离的）
-    // 使用椭球体法线公式：(x, y/scale^2, z)
-    n.set(v.x, v.y / (yScale * yScale), v.z).normalize()
-    normals.setXYZ(i, n.x, n.y, n.z)
+      let yScale = baseScaleY
+      // 对上半球应用额外的压扁，模拟"顶部平坦"的效果
+      // 使用平滑过渡以避免接缝，虽然 y>0 硬切也行，但平滑更好
+      if (v.y > 0) {
+        yScale *= topFlattenScale
+      }
+      v.y *= yScale
+
+      positions.setXYZ(i, v.x, v.y, v.z)
+
+      // 手动计算法线以修复接缝问题
+      // computeVertexNormals 会导致 UV 接缝处的法线不连续（因为顶点是分离的）
+      // 使用椭球体法线公式：(x, y/scale^2, z)
+      n.set(v.x, v.y / (yScale * yScale), v.z).normalize()
+      normals.setXYZ(i, n.x, n.y, n.z)
+    }
+    positions.needsUpdate = true
+    normals.needsUpdate = true
   }
 
   refs.planetMesh = new Mesh(planetGeo, mats.planet)
@@ -307,7 +317,7 @@ export function createPlanetRenderer(input: {
       clone.rotateY(rng.range(0, Math.PI * 2))
       
       clone.visible = true;
-      clone.traverse((child) => {
+      clone.traverse((child: any) => {
         if ((child as Mesh).isMesh) {
           child.castShadow = true
           child.receiveShadow = true;
@@ -341,6 +351,7 @@ export function createPlanetRenderer(input: {
         const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
         const modelIndex = Math.floor(rng.range(0, validRocks.length))
         const originalModel = validRocks[modelIndex]
+        if (!originalModel) continue
         const baseScale = originalModel.userData.modelName.includes('Pebble') 
           ? rockScaleConfig.cluster.pebbleBase 
           : rockScaleConfig.cluster.rockBase
@@ -371,38 +382,43 @@ export function createPlanetRenderer(input: {
         // 增加概率 (0.3 -> -1)，几乎 100% 生成草皮底座，填补空隙
         if (validGrassPatches.length > 0 && rng.next() > -1) { 
             const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
-            const patchModel = validGrassPatches[patchIndex].clone()
+            const patchBase = validGrassPatches[patchIndex]
+            if (patchBase) {
+              const patchModel = patchBase.clone()
             
-            // 根据模型名称调整缩放，因为原始模型尺寸差异很大
-          let patchScale = 0.02;
-          const modelName = patchModel.userData.modelName || '';
-          if (modelName.includes('grass_patch_3')) {
-            patchScale = rng.range(0.015, 0.025); // 原始尺寸很大 (~20m)
-          } else if (modelName.includes('grass_patch_2')) {
-            patchScale = rng.range(0.15, 0.25); // 原始尺寸中等 (~2.5m)
-          } else {
-            patchScale = rng.range(0.3, 0.5); // 原始尺寸较小 (~1m)
-          }
-          
-          patchModel.scale.setScalar(patchScale)
-          patchModel.rotation.y = rng.range(0, Math.PI * 2)
-          
-          // 确保草皮应用材质并可见
-          patchModel.visible = true;
-          patchModel.traverse((child) => {
-            if ((child as Mesh).isMesh) {
-              child.castShadow = true
-              child.receiveShadow = true;
-              (child as Mesh).material = mats.grassInstanced
-              child.visible = true;
+              // 根据模型名称调整缩放，因为原始模型尺寸差异很大
+              let patchScale = 0.02;
+              const modelName = patchModel.userData.modelName || '';
+              if (modelName.includes('grass_patch_3')) {
+                patchScale = rng.range(0.015, 0.025); // 原始尺寸很大 (~20m)
+              } else if (modelName.includes('grass_patch_2')) {
+                patchScale = rng.range(0.15, 0.25); // 原始尺寸中等 (~2.5m)
+              } else {
+                patchScale = rng.range(0.3, 0.5); // 原始尺寸较小 (~1m)
+              }
+              
+              patchModel.scale.setScalar(patchScale)
+              patchModel.rotation.y = rng.range(0, Math.PI * 2)
+              
+              // 确保草皮应用材质并可见
+              patchModel.visible = true;
+              patchModel.traverse((child: any) => {
+                if ((child as Mesh).isMesh) {
+                  child.castShadow = true
+                  child.receiveShadow = true;
+                  (child as Mesh).material = mats.grassInstanced
+                  child.visible = true;
+                }
+              })
+              
+              grassPatch.add(patchModel)
             }
-          })
-          
-          grassPatch.add(patchModel)
       }
 
       for(let m=0; m<subGrassCount; m++) {
-          const grassModel = validGrasses[modelIndex].clone()
+          const grassBase = validGrasses[modelIndex]
+          if (!grassBase) continue
+          const grassModel = grassBase.clone()
           // 内部随机偏移 - 范围缩小，更紧密
           const r = rng.range(0, 0.12) // 小范围偏移，紧凑
           const angle = rng.range(0, Math.PI * 2)
@@ -426,6 +442,7 @@ export function createPlanetRenderer(input: {
     
     const modelIndex = Math.floor(rng.range(0, validRocks.length))
     const originalModel = validRocks[modelIndex]
+    if (!originalModel) continue
     const baseScale = originalModel.userData.modelName.includes('Pebble') 
       ? rockScaleConfig.scattered.pebbleBase 
       : rockScaleConfig.scattered.rockBase
@@ -451,38 +468,43 @@ export function createPlanetRenderer(input: {
     // 添加草皮底座
     if (validGrassPatches.length > 0 && rng.next() > 0.2) { // 80%概率有草皮底座
         const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
-        const patchModel = validGrassPatches[patchIndex].clone()
+        const patchBase = validGrassPatches[patchIndex]
+        if (patchBase) {
+          const patchModel = patchBase.clone()
         
-        // 根据模型名称调整缩放
-        let patchScale = 0.02;
-        const modelName = patchModel.userData.modelName || '';
-        if (modelName.includes('grass_patch_3')) {
-          patchScale = rng.range(0.02, 0.03); // 原始尺寸很大
-        } else if (modelName.includes('grass_patch_2')) {
-          patchScale = rng.range(0.2, 0.3); // 原始尺寸中等
-        } else {
-          patchScale = rng.range(0.4, 0.6); // 原始尺寸较小
-        }
-
-        patchModel.scale.setScalar(patchScale) 
-        patchModel.rotation.y = rng.range(0, Math.PI * 2)
-
-        // 确保草皮应用材质并可见
-        patchModel.visible = true;
-        patchModel.traverse((child) => {
-          if ((child as Mesh).isMesh) {
-            child.castShadow = true
-            child.receiveShadow = true;
-            (child as Mesh).material = mats.grassInstanced
-            child.visible = true;
+          // 根据模型名称调整缩放
+          let patchScale = 0.02;
+          const modelName = patchModel.userData.modelName || '';
+          if (modelName.includes('grass_patch_3')) {
+            patchScale = rng.range(0.02, 0.03); // 原始尺寸很大
+          } else if (modelName.includes('grass_patch_2')) {
+            patchScale = rng.range(0.2, 0.3); // 原始尺寸中等
+          } else {
+            patchScale = rng.range(0.4, 0.6); // 原始尺寸较小
           }
-        })
-        
-        grassPatch.add(patchModel)
+
+          patchModel.scale.setScalar(patchScale) 
+          patchModel.rotation.y = rng.range(0, Math.PI * 2)
+
+          // 确保草皮应用材质并可见
+          patchModel.visible = true;
+          patchModel.traverse((child: any) => {
+            if ((child as Mesh).isMesh) {
+              child.castShadow = true
+              child.receiveShadow = true;
+              (child as Mesh).material = mats.grassInstanced
+              child.visible = true;
+            }
+          })
+          
+          grassPatch.add(patchModel)
+        }
     }
 
     for(let m=0; m<subGrassCount; m++) {
-        const grassModel = validGrasses[Math.floor(rng.range(0, validGrasses.length))].clone()
+        const grassBase = validGrasses[Math.floor(rng.range(0, validGrasses.length))]
+        if (!grassBase) continue
+        const grassModel = grassBase.clone()
         const r = rng.range(0, 0.25) // 覆盖范围，紧凑
         const angle = rng.range(0, Math.PI * 2)
         grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
@@ -513,7 +535,9 @@ export function createPlanetRenderer(input: {
       const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
       
       const modelIndex = Math.floor(rng.range(0, validFlowers.length))
-      const originalModel = validFlowers[modelIndex].clone()
+      const flowerBase = validFlowers[modelIndex]
+      if (!flowerBase) continue
+      const originalModel = flowerBase.clone()
       
       // --- 如何调节花朵大小 ---
       // 修改这里的 rng.range(最小值, 最大值) 参数
@@ -540,7 +564,7 @@ export function createPlanetRenderer(input: {
       clone.rotateZ(Math.sin(tiltAxis) * tiltAngle)
       
       clone.visible = true;
-      clone.traverse((child) => {
+      clone.traverse((child: any) => {
         if ((child as Mesh).isMesh) {
           child.castShadow = true
           child.receiveShadow = true

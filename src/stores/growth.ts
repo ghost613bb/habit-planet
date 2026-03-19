@@ -1,5 +1,55 @@
 import { defineStore } from 'pinia'
 
+let dayCountBridgeTeardown: (() => void) | null = null
+
+// 将“不确定类型”的输入尽量安全地转换为有限数字：
+// - number：要求是有限值（排除 NaN/Infinity）
+// - string：尝试用 parseFloat 转成数字（同样排除 NaN/Infinity）
+// - 其它类型：直接判定为无效
+function coerceFiniteNumber(input: unknown): number | null {
+  if (typeof input === 'number') return Number.isFinite(input) ? input : null
+  if (typeof input === 'string') {
+    const n = Number.parseFloat(input)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
+// 从客户端/调试侧传入的消息载荷里提取 dayCount：
+// - 支持直接传 number / string
+// - 支持传 JSON 字符串（会递归解析）
+// - 支持对象格式：{ dayCount: ... } 或 { type: 'dayCount', value: ... }
+// 解析失败时返回 null（上层会忽略该消息）
+function extractDayCount(payload: unknown): number | null {
+  // 1) 最简单情况：payload 本身就是数值或可解析成数值的字符串
+  const direct = coerceFiniteNumber(payload)
+  if (direct != null) return direct
+
+  // 2) 兼容某些 WebView/桥接只传字符串：如果是 JSON 字符串，尝试解析后递归处理
+  if (typeof payload === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(payload)
+      return extractDayCount(parsed)
+    } catch {
+      return null
+    }
+  }
+
+  // 3) 非对象载荷无法从 key/value 中提取
+  if (!payload || typeof payload !== 'object') return null
+
+  const data = payload as Record<string, unknown>
+  // 4) 约定格式：{ dayCount: number|string }
+  const byKey = coerceFiniteNumber(data.dayCount)
+  if (byKey != null) return byKey
+
+  // 5) 事件格式：{ type: 'dayCount' | 'dayCountChanged', value: number|string }
+  if (data.type === 'dayCount') return coerceFiniteNumber(data.value)
+  if (data.type === 'dayCountChanged') return coerceFiniteNumber(data.value)
+
+  return null
+}
+
 // 定义生长阶段的ID类型
 export type GrowthStageId = 'origin' | 'awakening' | 'vibrant' | 'civilization' | 'resonance'
 
@@ -102,6 +152,52 @@ export const useGrowthStore = defineStore('growth', {
   },
   // 操作方法
   actions: {
+    // 统一的 dayCount 写入口：
+    // - 外部（WebView 消息 / 调试函数）只要拿到 dayCount，都应该走这里
+    // - 这里会暂停自动增长，避免自动 tick 和外部输入同时改 value 造成“抢写”
+    setDayCount(dayCount: number) {
+      this.pause()
+      this.setValue(dayCount)
+    },
+    // 安装 dayCount 桥接（只安装一次）：
+    // 1) 监听 message 事件，兼容 H5 WebView / RN WebView 等常见通信方式
+    // 2) 暴露 window.setDayCount(n) 作为本地调试入口（控制台直接调用）
+    installDayCountBridge() {
+      if (dayCountBridgeTeardown) return
+
+      // 处理来自客户端/调试侧的消息：尝试从 event.data 里解析出 dayCount
+      const onMessage = (event: MessageEvent) => {
+        const next = extractDayCount(event.data)
+        if (next == null) return
+        this.setDayCount(next)
+      }
+
+      // 本地调试入口：window.setDayCount(数字)
+      const globalFn = (next: number) => {
+        this.setDayCount(next)
+      }
+
+      // 标准浏览器事件：window.postMessage(...)
+      window.addEventListener('message', onMessage)
+      // 部分 WebView 会把消息挂在 document 上（例如某些 RN WebView 实现）
+      document.addEventListener('message', onMessage as EventListener)
+      ;(window as any).setDayCount = globalFn
+
+      // 记录卸载函数：用于释放监听并移除调试入口，避免热更新/重复挂载导致多次触发
+      dayCountBridgeTeardown = () => {
+        window.removeEventListener('message', onMessage)
+        document.removeEventListener('message', onMessage as EventListener)
+        if ((window as any).setDayCount === globalFn) {
+          delete (window as any).setDayCount
+        }
+        dayCountBridgeTeardown = null
+      }
+    },
+    // 卸载 dayCount 桥接：通常用于销毁应用或极端场景下手动释放
+    disposeDayCountBridge() {
+      dayCountBridgeTeardown?.()
+      dayCountBridgeTeardown = null
+    },
     // 开始自动增长
     play() {
       this.playing = true

@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
-declare module 'three'
-
-declare module 'three/examples/jsm/controls/OrbitControls.js'
+declare global {
+  interface Window {
+    setDayCount?: (next: number) => void
+  }
+}
