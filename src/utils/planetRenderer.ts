@@ -208,19 +208,11 @@ export function createPlanetRenderer(input: {
     '/models/Rock_Medium_1.gltf',
     '/models/Rock_Medium_2.gltf',
   ]
-  const grassModels = [
-    '/models/Grass_Common_Short.gltf',
-    '/models/Grass_Common_Tall.gltf',
-    '/models/Grass_Wispy_Short.gltf',
-    '/models/Grass_Wispy_Tall.gltf',
+  const grassModels: string[] = [
   ]
   const grassPatchModels: string[] = [
-    '/models/grass_patch.gltf',
-    '/models/grass_patch_2.gltf',
   ]
   const flowerModels: string[] = [
-    '/models/Flower_3_Single.gltf',
-    '/models/Flower_4_Single.gltf',
   ]
 
   const rocksGroup = new Group()
@@ -361,75 +353,10 @@ export function createPlanetRenderer(input: {
       }
 
       // 放置伴生草丛 (在岩石周围)
+      // 注意：目前 validGrasses 已经为空，下面的循环实际上不会执行，保留作为占位
       for (let k = 0; k < grassInCluster; k++) {
-        if (validGrasses.length === 0) break;
-        // 减小偏移范围 (从 0.4 -> 0.25)，使草丛紧紧贴在岩石堆边缘
-        const offsetPhi = (rng.next() - 0.5) * 0.25 
-        const offsetTheta = (rng.next() - 0.5) * 0.25
-        let phi = clusterPhi + offsetPhi
-        let theta = clusterTheta + offsetTheta
-        if (phi < 0.1) phi = 0.1
-        if (phi > 1.2) phi = 1.2
-        
-        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-        const modelIndex = Math.floor(rng.range(0, validGrasses.length))
-        
-        // 组合草丛：每次随机取一个小草模型，组合成一簇
-        const subGrassCount = Math.floor(rng.range(12, 20)) // 增加数量，更茂密
-        const grassPatch = new Group()
-        
-        // 如果有草皮模型，先在底部放一个草皮作为底座
-        // 增加概率 (0.3 -> -1)，几乎 100% 生成草皮底座，填补空隙
-        if (validGrassPatches.length > 0 && rng.next() > -1) { 
-            const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
-            const patchBase = validGrassPatches[patchIndex]
-            if (patchBase) {
-              const patchModel = patchBase.clone()
-            
-              // 根据模型名称调整缩放，因为原始模型尺寸差异很大
-              let patchScale = 0.02;
-              const modelName = patchModel.userData.modelName || '';
-              if (modelName.includes('grass_patch_3')) {
-                patchScale = rng.range(0.015, 0.025); // 原始尺寸很大 (~20m)
-              } else if (modelName.includes('grass_patch_2')) {
-                patchScale = rng.range(0.15, 0.25); // 原始尺寸中等 (~2.5m)
-              } else {
-                patchScale = rng.range(0.3, 0.5); // 原始尺寸较小 (~1m)
-              }
-              
-              patchModel.scale.setScalar(patchScale)
-              patchModel.rotation.y = rng.range(0, Math.PI * 2)
-              
-              // 确保草皮应用材质并可见
-              patchModel.visible = true;
-              patchModel.traverse((child: any) => {
-                if ((child as Mesh).isMesh) {
-                  child.castShadow = true
-                  child.receiveShadow = true;
-                  (child as Mesh).material = mats.grassInstanced
-                  child.visible = true;
-                }
-              })
-              
-              grassPatch.add(patchModel)
-            }
+        if (validGrasses.length === 0 && validGrassPatches.length === 0) break;
       }
-
-      for(let m=0; m<subGrassCount; m++) {
-          const grassBase = validGrasses[modelIndex]
-          if (!grassBase) continue
-          const grassModel = grassBase.clone()
-          // 内部随机偏移 - 范围缩小，更紧密
-          const r = rng.range(0, 0.12) // 小范围偏移，紧凑
-          const angle = rng.range(0, Math.PI * 2)
-          grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
-          grassModel.rotation.y = rng.range(0, Math.PI * 2)
-          grassModel.scale.setScalar(rng.range(0.04, 0.08)) // 缩小草的大小，看起来更矮
-          grassPatch.add(grassModel)
-      }
-      
-      placeObject(grassPatch, normal, 1.0, mats.grassInstanced)
-    }
   }
 
   // 2. 生成散落岩石 (Scattered) - 保持原有逻辑
@@ -452,74 +379,14 @@ export function createPlanetRenderer(input: {
   }
 
   // 3. 生成独立草被 (Independent Grass Patches)
+  // 草被模型已清空，此段逻辑实际上不会执行，保留作为占位
   const independentGrassCount = 20
   for (let n = 0; n < independentGrassCount; n++) {
-    if (validGrasses.length === 0) break;
-    const phi = rng.range(0.15, 1.1)
-    const theta = rng.range(0, Math.PI * 2)
-    const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-    
-    const modelIndex = Math.floor(rng.range(0, validGrasses.length))
-    
-    // 组合草丛
-    const subGrassCount = Math.floor(rng.range(15, 25)) // 独立草被更茂密
-    const grassPatch = new Group()
-    
-    // 添加草皮底座
-    if (validGrassPatches.length > 0 && rng.next() > 0.2) { // 80%概率有草皮底座
-        const patchIndex = Math.floor(rng.range(0, validGrassPatches.length))
-        const patchBase = validGrassPatches[patchIndex]
-        if (patchBase) {
-          const patchModel = patchBase.clone()
-        
-          // 根据模型名称调整缩放
-          let patchScale = 0.02;
-          const modelName = patchModel.userData.modelName || '';
-          if (modelName.includes('grass_patch_3')) {
-            patchScale = rng.range(0.02, 0.03); // 原始尺寸很大
-          } else if (modelName.includes('grass_patch_2')) {
-            patchScale = rng.range(0.2, 0.3); // 原始尺寸中等
-          } else {
-            patchScale = rng.range(0.4, 0.6); // 原始尺寸较小
-          }
-
-          patchModel.scale.setScalar(patchScale) 
-          patchModel.rotation.y = rng.range(0, Math.PI * 2)
-
-          // 确保草皮应用材质并可见
-          patchModel.visible = true;
-          patchModel.traverse((child: any) => {
-            if ((child as Mesh).isMesh) {
-              child.castShadow = true
-              child.receiveShadow = true;
-              (child as Mesh).material = mats.grassInstanced
-              child.visible = true;
-            }
-          })
-          
-          grassPatch.add(patchModel)
-        }
-    }
-
-    for(let m=0; m<subGrassCount; m++) {
-        const grassBase = validGrasses[Math.floor(rng.range(0, validGrasses.length))]
-        if (!grassBase) continue
-        const grassModel = grassBase.clone()
-        const r = rng.range(0, 0.25) // 覆盖范围，紧凑
-        const angle = rng.range(0, Math.PI * 2)
-        grassModel.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r)
-        grassModel.rotation.y = rng.range(0, Math.PI * 2)
-        // 稍微随机化草的倾斜度，更自然
-        grassModel.rotation.x = rng.range(-0.2, 0.2)
-        grassModel.rotation.z = rng.range(-0.2, 0.2)
-        grassModel.scale.setScalar(rng.range(0.05, 0.1)) // 缩小
-        grassPatch.add(grassModel)
-    }
-    
-    placeObject(grassPatch, normal, 1.0, mats.grassInstanced)
+    if (validGrassPatches.length === 0) break;
   }
 
     // 4. 生成花朵 (Flowers) - 上1/5区域
+    // 花朵模型已清空，此段逻辑实际上不会执行，保留作为占位
     const flowerCount = 4
     for (let i = 0; i < flowerCount; i++) {
       if (validFlowers.length === 0) break;
