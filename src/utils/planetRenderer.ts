@@ -7,6 +7,7 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   Object3D,
   PerspectiveCamera,
   Points,
@@ -209,6 +210,7 @@ export function createPlanetRenderer(input: {
     '/models/Rock_Medium_2.gltf',
   ]
   const grassModels: string[] = [
+    '/models/scene.gltf'
   ]
   const grassPatchModels: string[] = [
   ]
@@ -240,9 +242,33 @@ export function createPlanetRenderer(input: {
     // 加载草丛
     ...grassModels.map(url => new Promise<Group>((resolve) => {
       gltfLoader.load(url, (gltf) => {
-        gltf.scene.userData.type = 'grass'; // 标记为草
-        gltf.scene.userData.modelName = url;
-        resolve(gltf.scene)
+        const model = gltf.scene;
+        model.userData.type = 'grass'; // 标记为草
+        model.userData.modelName = url;
+        
+        // 针对特定的模型调整其原点中心
+        if (url.includes('scene.gltf')) {
+          import('three').then(({ Box3, Vector3, Group }) => {
+            const box = new Box3().setFromObject(model);
+            const center = box.getCenter(new Vector3());
+            const size = box.getSize(new Vector3());
+            
+            // 使用 Wrapper 包裹模型，避免直接修改 GLTF 内部节点的 Position 导致矩阵冲突
+            const wrapper = new Group();
+            wrapper.userData = model.userData; // 转移 userData，以便后续识别
+            
+            console.log('grass model box size:', size);
+            
+            model.position.x -= center.x;
+            model.position.y -= (center.y - size.y / 2); // 底部对齐
+            model.position.z -= center.z;
+            
+            wrapper.add(model);
+            resolve(wrapper);
+          });
+        } else {
+          resolve(model);
+        }
       }, undefined, (error) => {
         console.warn(`Failed to load grass model: ${url}`, error)
         resolve(new Group())
@@ -299,21 +325,47 @@ export function createPlanetRenderer(input: {
     if (validRocks.length === 0 && validGrasses.length === 0 && validGrassPatches.length === 0 && validFlowers.length === 0) return
     
     // 辅助函数：放置单个物体
-    const placeObject = (obj: Object3D, normal: Vector3, scale: number, material: any) => {
+    // 增加 heightOffset 参数，允许物体在计算出的地表位置上再向外偏移一定距离
+    const placeObject = (obj: Object3D, normal: Vector3, scale: number, material?: any, isGrass: boolean = false, heightOffset: number = 0) => {
       const clone = obj.clone()
       clone.scale.setScalar(scale)
       
-      const { pos, quaternion } = getSurfaceTransform(normal, planetRadius)
+      // 在原有的 planetRadius 基础上加上偏移量，使得物体可以“浮”出地面贴图的高度
+      const { pos, quaternion } = getSurfaceTransform(normal, planetRadius + heightOffset)
       clone.position.copy(pos)
       clone.setRotationFromQuaternion(quaternion)
-      clone.rotateY(rng.range(0, Math.PI * 2))
+      
+      // 给草地模型增加更丰富的随机旋转，打破其原本方正的形状特征
+      if (isGrass) {
+        // Y轴(法线方向)完全随机旋转
+        clone.rotateY(rng.range(0, Math.PI * 2))
+        // 移除 X/Z 轴旋转，草皮底座必须严格贴合地表法线
+        // clone.rotateX(rng.range(-0.02, 0.02))
+        // clone.rotateZ(rng.range(-0.02, 0.02))
+      } else {
+        clone.rotateY(rng.range(0, Math.PI * 2))
+      }
       
       clone.visible = true;
       clone.traverse((child: any) => {
         if ((child as Mesh).isMesh) {
-          child.castShadow = true
+          // 草地数量极大，关闭投射阴影可以巨幅提升性能
+          child.castShadow = !isGrass; 
           child.receiveShadow = true;
-          (child as Mesh).material = material
+          
+          if (material) {
+            (child as Mesh).material = material
+          } else if (isGrass) {
+            // 完全覆盖材质，避免被原模型的 PBR 贴图、环境光遮蔽或自发光等属性影响颜色
+            // 使用 MeshStandardMaterial 赋予自然的深绿色
+            const mat = new MeshStandardMaterial({
+              color: new Color('#3b5e2b'), // 自然的深绿色，带有一点点黄调的草绿
+              roughness: 0.9,
+              metalness: 0.05
+            });
+            child.material = mat;
+          }
+          
           child.visible = true;
         }
       })
@@ -327,8 +379,9 @@ export function createPlanetRenderer(input: {
       const clusterTheta = rng.range(0, Math.PI * 2)
       const rocksInCluster = Math.floor(rng.range(3, 8))
       
-      // 在岩石堆附近添加草丛 - 增加数量，使岩石周围更茂密
-      const grassInCluster = Math.floor(rng.range(18, 23)) 
+      // 放置伴生草丛 (在岩石周围)
+      // 因为单块草变小了，需要增加数量来填补
+      const grassInCluster = Math.floor(rng.range(6, 12)) 
       
       // 放置岩石
       for (let j = 0; j < rocksInCluster; j++) {
@@ -353,10 +406,36 @@ export function createPlanetRenderer(input: {
       }
 
       // 放置伴生草丛 (在岩石周围)
-      // 注意：目前 validGrasses 已经为空，下面的循环实际上不会执行，保留作为占位
       for (let k = 0; k < grassInCluster; k++) {
         if (validGrasses.length === 0 && validGrassPatches.length === 0) break;
-      }
+        
+        const offsetPhi = (rng.next() - 0.5) * 0.4
+        const offsetTheta = (rng.next() - 0.5) * 0.4
+        let phi = clusterPhi + offsetPhi
+        let theta = clusterTheta + offsetTheta
+        
+        // 限制伴生草丛分布在整个星球顶部半球
+        if (phi < 0.0) phi = 0.0
+        if (phi > 0.29) continue // 与独立草坪的范围(0.29)保持一致
+
+        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+        
+        const isPatch = validGrassPatches.length > 0 && rng.next() > 0.5
+        const sourceArray = (isPatch || validGrasses.length === 0) ? validGrassPatches : validGrasses
+        if (sourceArray.length === 0) continue
+
+        const modelIndex = Math.floor(rng.range(0, sourceArray.length))
+        const originalModel = sourceArray[modelIndex]
+        if (!originalModel) continue
+        
+        // 专门针对 scene.gltf (草皮模型) 调整大小
+    // 伴生在石头旁边的草/苔藓，也需要足够大以防陷入地表，但也不能太大导致边缘翘起
+    const baseScale = originalModel.userData.modelName?.includes('scene.gltf') ? 0.07 : 0.09;
+    const scale = baseScale * rng.range(0.5, 1.2)
+        
+    // 尺寸变小后厚度也变小了，把负偏移量改小一点，甚至变成0，防止完全被地表吞没
+    placeObject(originalModel, normal, scale, undefined, true, 0.0) 
+  }
   }
 
   // 2. 生成散落岩石 (Scattered) - 保持原有逻辑
@@ -379,10 +458,40 @@ export function createPlanetRenderer(input: {
   }
 
   // 3. 生成独立草被 (Independent Grass Patches)
-  // 草被模型已清空，此段逻辑实际上不会执行，保留作为占位
-  const independentGrassCount = 20
+  // 为了打破方形边缘，我们需要：1. 增加数量让它们互相重叠掩盖边界；2. 增加大小的差异性；3. 让边缘逐渐稀疏。
+  // 因为我们将单块尺寸大幅缩小了以贴合球面，所以必须巨幅增加数量来弥补覆盖面积
+  // 范围再次变大，数量稍微减少或保持不变以进一步实现“稍微窸窣”的效果
+  const independentGrassCount = 1800 
   for (let n = 0; n < independentGrassCount; n++) {
-    if (validGrassPatches.length === 0) break;
+    if (validGrasses.length === 0 && validGrassPatches.length === 0) break;
+    
+    // 进一步扩大范围，让草被分布的区域更大一点点
+    const maxPhi = 0.45; // 从 0.35 扩大到 0.45
+    
+    // 稍微向中心聚集，并引入一些不规则的散布
+    const distFactor = Math.pow(rng.next(), 0.7); 
+    const phi = distFactor * maxPhi * rng.range(0.6, 1.5); // 增加随机范围打破完美圆
+    const theta = rng.range(0, Math.PI * 2)
+    const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
+    
+    const isPatch = validGrassPatches.length > 0 && rng.next() > 0.5
+    const sourceArray = (isPatch || validGrasses.length === 0) ? validGrassPatches : validGrasses
+    if (sourceArray.length === 0) continue
+
+    const modelIndex = Math.floor(rng.range(0, sourceArray.length))
+    const originalModel = sourceArray[modelIndex]
+    if (!originalModel) continue
+    
+    // 专门针对 scene.gltf (草皮模型) 调整大小
+    // 采用“小块多次”策略：大幅减小单块草皮尺寸，使其更容易贴合球面曲率，避免大块方形模型两端翘起
+    // 适当调大一点，避免太小全被置换贴图吞掉
+    const baseScale = originalModel.userData.modelName?.includes('scene.gltf') ? 0.15 : 0.01;
+    // 距离中心越远 (distFactor越接近1)，草皮尺寸越小，形成柔和过渡
+    const edgeSoftness = 1.0 - (distFactor * 0.7); // 中心为1.0，边缘缩水到0.3
+    const scale = baseScale * rng.range(0.8, 1.8) * edgeSoftness;
+    
+    // 尺寸变小后，基座变薄，不能埋太深。设置为0，完全靠模型贴合地表
+    placeObject(originalModel, normal, scale, undefined, true, 0.0) 
   }
 
     // 4. 生成花朵 (Flowers) - 上1/5区域
