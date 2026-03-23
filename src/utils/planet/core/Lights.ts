@@ -10,8 +10,9 @@ export function setupLights(scene: Scene) {
   const sunLight = new DirectionalLight(0xffce84, 5.5) 
   sunLight.position.set(10, 8, 8)
   sunLight.castShadow = true
-  sunLight.shadow.mapSize.width = 2048
-  sunLight.shadow.mapSize.height = 2048
+  // 优化：将阴影贴图分辨率从 2048 降为 1024。由于星球表面较大，2048会占用大量显存和计算资源
+  sunLight.shadow.mapSize.width = 1024
+  sunLight.shadow.mapSize.height = 1024
   sunLight.shadow.camera.near = 0.5
   sunLight.shadow.camera.far = 50
   sunLight.shadow.camera.left = -10
@@ -19,8 +20,8 @@ export function setupLights(scene: Scene) {
   sunLight.shadow.camera.top = 10
   sunLight.shadow.camera.bottom = -10
   // 柔化阴影边缘
-  sunLight.shadow.radius = 4; // 增加模糊半径
-  sunLight.shadow.bias = -0.0001; // 防止阴影条纹
+  sunLight.shadow.radius = 2; // 降低模糊半径以减少采样性能消耗
+  sunLight.shadow.bias = -0.0005; // 调整偏移以防止伪影
   // PCSS 软阴影通常需要 WebGLRenderer 的特殊配置，但在标准材质下 radius 能起一定作用
   
   scene.add(sunLight)
@@ -38,7 +39,8 @@ export function setupLights(scene: Scene) {
   spotLight.angle = Math.PI / 14; // 稍微扩大角度，覆盖更多受光面
   spotLight.penumbra = 0.5; // 边缘柔和度
   spotLight.distance = 30; // 增加照射距离
-  spotLight.castShadow = true;
+  // 优化：关闭 spotLight 的阴影。场景中已经有 sunLight 投射阴影，多个光源投射阴影会成倍增加渲染负担，导致严重卡顿
+  spotLight.castShadow = false;
   scene.add(spotLight);
   scene.add(spotLight.target); // 必须添加 target 到场景才能生效
 
