@@ -1,0 +1,138 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.3.0",
+    "version": "2.0",
+    "extras": {
+      "author": "Cliffcographics (https://sketchfab.com/Cliffcographics)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/grass-square-thinner-cbedefa9628f42babbb3d0104a3a72c4",
+      "title": "Grass square thinner"
+    }
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5125,
+      "count": 1065486
+    },
+    {
+      "type": "VEC4",
+      "componentType": 5126,
+      "count": 565176
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 565176
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 565176,
+      "max": [
+        2.8150172233581543,
+        3.0970265865325928,
+        1.5152949094772339
+      ],
+      "min": [
+        -3.3155007362365723,
+        -2.9867165088653564,
+        0.31336459517478943
+      ]
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 2496193
+    }
+  ],
+  "buffers": [
+    {
+      "name": "scene_compressed",
+      "uri": "scene_compressed.bin",
+      "byteLength": 2496193
+    }
+  ],
+  "materials": [
+    {
+      "name": "Material.001",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0738648,
+          0.470963,
+          0.0204369,
+          1
+        ],
+        "roughnessFactor": 0.910357923591956,
+        "metallicFactor": 0
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Mesh_Material.001_0",
+      "primitives": [
+        {
+          "attributes": {
+            "COLOR_0": 1,
+            "NORMAL": 2,
+            "POSITION": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0,
+          "extensions": {
+            "KHR_draco_mesh_compression": {
+              "bufferView": 0,
+              "attributes": {
+                "COLOR_0": 0,
+                "NORMAL": 1,
+                "POSITION": 2
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Mesh_Material.001_0",
+      "translation": [
+        0.37408209918255864,
+        0.17743119796891804,
+        0.12088659016296432
+      ],
+      "rotation": [
+        -0.707106880934548,
+        0,
+        0,
+        0.7071066814385331
+      ],
+      "scale": [
+        0.8145248993964884,
+        0.8186537750366227,
+        0.32563849674973255
+      ],
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0,
+  "extensionsUsed": [
+    "KHR_draco_mesh_compression"
+  ],
+  "extensionsRequired": [
+    "KHR_draco_mesh_compression"
+  ]
+}

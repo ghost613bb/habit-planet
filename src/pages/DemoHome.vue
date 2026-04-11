@@ -72,8 +72,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import PlanetCanvas from '@/components/PlanetCanvas.vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+const PlanetCanvas = defineAsyncComponent(() => import('@/components/PlanetCanvas.vue'))
 import { useGrowthStore } from '@/stores/growth'
 
 const store = useGrowthStore()
