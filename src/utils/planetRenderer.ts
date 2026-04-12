@@ -31,10 +31,20 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
+import StageManager from './planet/stages'
 
 export type { Stage } from './planet/types'
 
 const PLANET_RADIUS_BASE = 3.0
+
+// 阶段阈值常量
+const STAGE_THRESHOLDS = {
+  T1: 4,    // 阶段1结束，进入阶段2
+  T2: 11,   // 阶段2结束，进入阶段3
+  T3: 22,   // 阶段3结束，进入阶段4
+  T4: 46,   // 阶段4结束，进入阶段5
+  T5: 91    // 阶段5结束，进入阶段6
+};
 
 // --- 纹理加载 ---
 const textureLoader = new TextureLoader()
@@ -84,6 +94,7 @@ export function createPlanetRenderer(input: {
   const { canvas, dayCount: initialDayCount, timeOfDay = 12 } = input
   const host = input.host ?? (canvas.parentElement as HTMLDivElement)
   let dayCount = initialDayCount
+  let stageManager: StageManager;
 
   // 引用对象 (Refs) 用于存储需要更新的场景物体
   const refs: any = {
@@ -165,6 +176,9 @@ export function createPlanetRenderer(input: {
   scene.add(planetGroup)
   refs.planetGroup = planetGroup
 
+  // 初始化阶段管理器
+  stageManager = new StageManager(scene, planetGroup)
+
   const planetRadius = PLANET_RADIUS_BASE
   const grassRadius = 3.05
 
@@ -232,365 +246,6 @@ export function createPlanetRenderer(input: {
   refs.grassMesh.scale.set(0.01, 0.01, 0.01)
   refs.grassMesh.visible = false
   planetGroup.add(refs.grassMesh)
-
-  // --- 放置小岩石和草丛 ---
-  // 需求：上1/3部分，位置固定（使用固定种子），大小不一，分布不均匀（聚类），美观
-  const rockModels = [
-    '/models/Pebble_Round_1.gltf',
-    '/models/Pebble_Round_4.gltf',
-    '/models/Rock_Medium_1.gltf',
-    '/models/Rock_Medium_2.gltf',
-  ]
-  const grassModels: string[] = [
-    '/models/Grass_Wispy_Short.gltf'
-  ]
-  const grassPatchModels: string[] = [
-  ]
-  const flowerModels: string[] = [
-  ]
-
-  const rocksGroup = new Group()
-  planetGroup.add(rocksGroup)
-  refs.rocksGroup = rocksGroup
-  
-  // 确保岩石组本身是可见的
-  rocksGroup.visible = true;
-
-  const rng = new SeededRandom(20231027) // 固定种子
-
-  // 通用模型加载函数
-  function loadModel(url: string, type: string): Promise<Group> {
-    return new Promise((resolve) => {
-      gltfLoader.load(url, (gltf) => {
-        const model = gltf.scene;
-        model.userData.type = type;
-        model.userData.modelName = url;
-        
-        // 草模型特殊处理
-        if (type === 'grass' && (url.includes('scene.gltf') || url.includes('scene_compressed.gltf') || url.includes('Grass_Common_Short.gltf') || url.includes('Grass_Wispy_Short.gltf'))) {
-          import('three').then(({ Box3, Vector3, Group }) => {
-            const box = new Box3().setFromObject(model);
-            const center = box.getCenter(new Vector3());
-            const size = box.getSize(new Vector3());
-            
-            const wrapper = new Group();
-            wrapper.userData = model.userData;
-            
-            model.position.x -= center.x;
-            model.position.y -= (center.y - size.y / 2); // 底部对齐
-            model.position.z -= center.z;
-            
-            wrapper.add(model);
-            resolve(wrapper);
-          });
-        } else {
-          resolve(model);
-        }
-      }, undefined, (error) => {
-        console.warn(`Failed to load ${type} model: ${url}`, error);
-        resolve(new Group());
-      });
-    });
-  }
-
-  // 预加载模型并生成装饰物（岩石+草丛）
-  Promise.all([
-    ...rockModels.map(url => loadModel(url, 'rock')),
-    ...grassModels.map(url => loadModel(url, 'grass')),
-    ...grassPatchModels.map(url => loadModel(url, 'grassPatch')),
-    ...flowerModels.map(url => loadModel(url, 'flower'))
-  ]).then(async loadedModels => {
-    // 异步分片工具：让出主线程，防止浏览器卡死（Long Task）
-    const yieldToMain = () => new Promise(resolve => setTimeout(resolve, 0));
-
-    // --- 缩放计算函数 ---
-    function calculateScale(model: Group, type: string, config?: { variationMin?: number, variationMax?: number, distFactor?: number }) {
-      const { variationMin = 0.8, variationMax = 1.8, distFactor = 1 } = config || {};
-      let baseScale = 0.01;
-      
-      if (type === 'grass') {
-        if (model.userData.modelName?.includes('scene_compressed.gltf') || 
-            model.userData.modelName?.includes('Grass_Common_Short.gltf') || 
-            model.userData.modelName?.includes('Grass_Wispy_Short.gltf')) {
-          baseScale = 0.15;
-        }
-      } else if (type === 'rock') {
-        baseScale = model.userData.modelName?.includes('Pebble') ? 0.12 : 0.06;
-      }
-      
-      // 只对草模型应用边缘软化效果
-      let edgeSoftness = 1.0;
-      if (type === 'grass') {
-        edgeSoftness = 1.0 - (distFactor * 0.7);
-      }
-      
-      return baseScale * rng.range(variationMin, variationMax) * edgeSoftness;
-    }
-
-    // --- 岩石大小配置 ---
-    const rockScaleConfig = {
-      cluster: {
-        variationMin: 0.8,
-        variationMax: 1.5
-      },
-      scattered: {
-        variationMin: 0.8,
-        variationMax: 1.2
-      }
-    };
-
-    // 过滤掉加载失败的模型并分类
-    const validRocks = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'rock')
-    const validGrasses = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'grass')
-    const validGrassPatches = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'grassPatch')
-    const validFlowers = loadedModels.filter(m => m.children.length > 0 && m.userData.type === 'flower')
-    
-    if (validRocks.length === 0 && validGrasses.length === 0 && validGrassPatches.length === 0 && validFlowers.length === 0) return
-    
-    // 辅助函数：放置单个物体
-    const grassTransformsMap = new Map<Object3D, Matrix4[]>();
-    
-    // 预分配临时对象，避免内存抖动
-    const tempPos = new Vector3();
-    const tempQuat = new Quaternion();
-    const tempScale = new Vector3();
-    const tempMatrix = new Matrix4();
-    const yAxis = new Vector3(0, 1, 0);
-
-    const placeObject = (obj: Object3D, normal: Vector3, scale: number, material?: any, isGrass: boolean = false, heightOffset: number = 0) => {
-      // 在原有的 planetRadius 基础上加上偏移量，使得物体可以“浮”出地面贴图的高度
-      const { pos, quaternion } = getSurfaceTransform(normal, planetRadius + heightOffset)
-
-      // 如果是草，我们收集它的位置矩阵而不是直接克隆生成网格，后续统一使用 InstancedMesh 渲染以大幅提升性能
-      if (isGrass) {
-        // 优化：使用纯矩阵运算替代 new Object3D().updateMatrix()
-        tempPos.copy(pos);
-        tempQuat.copy(quaternion);
-        
-        // 给草地模型增加更丰富的随机旋转，打破其原本方正的形状特征 (绕局部 Y 轴)
-        const randomYRot = new Quaternion().setFromAxisAngle(yAxis, rng.range(0, Math.PI * 2));
-        tempQuat.multiply(randomYRot);
-        
-        tempScale.setScalar(scale);
-        tempMatrix.compose(tempPos, tempQuat, tempScale);
-        
-        if (!grassTransformsMap.has(obj)) {
-          grassTransformsMap.set(obj, [])
-        }
-        grassTransformsMap.get(obj)!.push(tempMatrix.clone())
-        return; // 提前返回，不再克隆
-      }
-
-      const clone = obj.clone()
-      clone.scale.setScalar(scale)
-      clone.position.copy(pos)
-      clone.setRotationFromQuaternion(quaternion)
-      
-      clone.rotateY(rng.range(0, Math.PI * 2))
-      
-      clone.visible = true;
-      
-      // 更新一次世界矩阵。注意必须在添加到场景或进行矩阵更新前恢复 autoUpdate，否则子节点可能无法正确继承父节点的变换
-      clone.updateMatrix();
-      
-      clone.traverse((child: any) => {
-        child.matrixAutoUpdate = true;
-        if ((child as Mesh).isMesh) {
-          child.castShadow = false
-          child.receiveShadow = false
-          
-          if (material) {
-            (child as Mesh).material = material
-          }
-          
-          child.visible = true;
-        }
-      })
-      rocksGroup.add(clone)
-    }
-
-    // 1. 生成聚类岩石 (Cluster) - 保持原有逻辑
-    const clusterCount = 6 
-    for (let i = 0; i < clusterCount; i++) {
-      const clusterPhi = rng.range(0.2, 1.0)
-      const clusterTheta = rng.range(0, Math.PI * 2)
-      const rocksInCluster = Math.floor(rng.range(3, 8))
-      
-      // 放置伴生草丛 (在岩石周围)
-      // 因为单块草变小了，需要增加数量来填补
-      const grassInCluster = Math.floor(rng.range(6, 12)) 
-      
-      // 放置岩石
-      for (let j = 0; j < rocksInCluster; j++) {
-        if (validRocks.length === 0) break;
-        const offsetPhi = (rng.next() - 0.5) * 0.3
-        const offsetTheta = (rng.next() - 0.5) * 0.3
-        let phi = clusterPhi + offsetPhi
-        let theta = clusterTheta + offsetTheta
-        if (phi < 0.1) phi = 0.1
-        if (phi > 1.2) phi = 1.2
-
-        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-        const modelIndex = Math.floor(rng.range(0, validRocks.length))
-        const originalModel = validRocks[modelIndex]
-        if (!originalModel) continue
-        const scale = calculateScale(originalModel, 'rock', rockScaleConfig.cluster)
-        
-        placeObject(originalModel, normal, scale, mats.rockInstanced)
-      }
-
-      // 放置伴生草丛 (在岩石周围)
-      for (let k = 0; k < grassInCluster; k++) {
-        if (validGrasses.length === 0 && validGrassPatches.length === 0) break;
-        
-        const offsetPhi = (rng.next() - 0.5) * 0.4
-        const offsetTheta = (rng.next() - 0.5) * 0.4
-        let phi = clusterPhi + offsetPhi
-        let theta = clusterTheta + offsetTheta
-        
-        // 限制伴生草丛分布在整个星球顶部半球
-        if (phi < 0.0) phi = 0.0
-        if (phi > 0.29) continue // 与独立草坪的范围(0.29)保持一致
-
-        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-        
-        const isPatch = validGrassPatches.length > 0 && rng.next() > 0.5
-        const sourceArray = (isPatch || validGrasses.length === 0) ? validGrassPatches : validGrasses
-        if (sourceArray.length === 0) continue
-
-        const modelIndex = Math.floor(rng.range(0, sourceArray.length))
-        const originalModel = sourceArray[modelIndex]
-        if (!originalModel) continue
-        
-        // 计算伴生草丛缩放
-        const scale = calculateScale(originalModel, 'grass', { variationMin: 0.5, variationMax: 1.2 });
-        
-        // 尺寸变小后厚度也变小了，把负偏移量改小一点，甚至变成0，防止完全被地表吞没
-        placeObject(originalModel, normal, scale, undefined, true, 0.0);
-      }
-    }
-
-  // 2. 生成散落岩石 (Scattered) - 保持原有逻辑
-  const scatteredRockCount = 12
-  for (let k = 0; k < scatteredRockCount; k++) {
-    if (validRocks.length === 0) break;
-    const phi = rng.range(0.1, 1.1)
-    const theta = rng.range(0, Math.PI * 2)
-    const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-    
-    const modelIndex = Math.floor(rng.range(0, validRocks.length))
-    const originalModel = validRocks[modelIndex]
-    if (!originalModel) continue
-    const scale = calculateScale(originalModel, 'rock', rockScaleConfig.scattered)
-    
-    placeObject(originalModel, normal, scale, mats.rockInstanced)
-  }
-
-  // 生成独立草被
-  const independentGrassCount = 800 
-  
-  // 使用批次处理避免主线程阻塞
-  const batchSize = 300;
-  const processGrassBatch = (startIndex: number) => {
-    return new Promise<void>((resolve) => {
-      const endIndex = Math.min(startIndex + batchSize, independentGrassCount);
-      for (let n = startIndex; n < endIndex; n++) {
-        if (validGrasses.length === 0 && validGrassPatches.length === 0) break;
-        
-        // 进一步扩大范围，让草被分布的区域更大一点点
-        const maxPhi = 0.45; // 从 0.35 扩大到 0.45
-        
-        // 稍微向中心聚集，并引入一些不规则的散布
-        const distFactor = Math.pow(rng.next(), 0.7); 
-        const phi = distFactor * maxPhi * rng.range(0.6, 1.5); // 增加随机范围打破完美圆
-        const theta = rng.range(0, Math.PI * 2)
-        const normal = new Vector3().setFromSphericalCoords(1, phi, theta)
-        
-        const isPatch = validGrassPatches.length > 0 && rng.next() > 0.5
-        const sourceArray = (isPatch || validGrasses.length === 0) ? validGrassPatches : validGrasses
-        if (sourceArray.length === 0) continue
-
-        const modelIndex = Math.floor(rng.range(0, sourceArray.length))
-        const originalModel = sourceArray[modelIndex]
-        if (!originalModel) continue
-        
-        // 计算草模型缩放
-        const scale = calculateScale(originalModel, 'grass', { distFactor });
-        
-        // 尺寸变小后，基座变薄，不能埋太深。设置为0，完全靠模型贴合地表
-        placeObject(originalModel, normal, scale, undefined, true, 0.0) 
-      }
-      
-      if (endIndex < independentGrassCount) {
-        requestAnimationFrame(() => {
-          processGrassBatch(endIndex).then(resolve);
-        });
-      } else {
-        resolve();
-      }
-    });
-  };
-
-  await processGrassBatch(0);
-
-
-
-    // 构建草地的 InstancedMesh
-    // 使用实例化渲染优化性能，使用 Lambert 材质消除高光闪烁
-    const grassMat = new MeshLambertMaterial({
-      color: new Color('#3b5e2b'), // 自然的深绿色
-      // Lambert 材质不需要 roughness 和 metalness
-    });
-
-    grassTransformsMap.forEach((transforms, obj) => {
-      const count = transforms.length;
-      if (count === 0) return;
-
-      // 提取原始 Group 内部所有 Mesh 的几何体及其相对于 Group 的局部变换
-      const meshesInfo: { mesh: Mesh, localMatrix: Matrix4 }[] = [];
-      obj.updateWorldMatrix(false, true);
-      const inverseRootMatrix = obj.matrixWorld.clone().invert();
-
-      obj.traverse((child: any) => {
-        if ((child as Mesh).isMesh) {
-          const mesh = child as Mesh;
-          mesh.updateWorldMatrix(false, true);
-          const localMatrix = mesh.matrixWorld.clone().premultiply(inverseRootMatrix);
-          meshesInfo.push({ mesh, localMatrix });
-        }
-      });
-
-      // 为每个内部的 Mesh 创建对应的 InstancedMesh
-      meshesInfo.forEach(({ mesh, localMatrix }) => {
-        const instancedMesh = new InstancedMesh(mesh.geometry, grassMat, count);
-        // 优化：草地数量极大且本身就是深色，关闭投射和接收阴影可以避免每帧对几百万个像素进行阴影贴图采样
-        instancedMesh.castShadow = false;
-        instancedMesh.receiveShadow = false;
-        
-        // 优化：关闭矩阵的每帧自动更新。草地一旦种下就不会乱跑，这能节省极大的 CPU 遍历开销
-        instancedMesh.matrixAutoUpdate = false;
-
-        const finalMatrix = new Matrix4();
-        for (let i = 0; i < count; i++) {
-          finalMatrix.multiplyMatrices(transforms[i], localMatrix);
-          instancedMesh.setMatrixAt(i, finalMatrix);
-        }
-        instancedMesh.instanceMatrix.needsUpdate = true;
-        
-        // 优化：显式计算包围球，让 Three.js 能够正确进行视锥体裁剪（Frustum Culling）
-        instancedMesh.computeBoundingSphere();
-        // 但是！在某些老旧设备或极其复杂的 InstancedMesh 上，Three.js 内部的 Frustum Culling 算法
-        // 在每一帧检测 1800 个实例是否在视野内时，反而会消耗比直接交给 GPU 渲染更多的 CPU 算力（即所谓的 Culling Overhead）。
-        // 如果渲染卡顿主要发生在旋转（相机移动）时，直接关闭剔除，让 GPU 暴力吞吐，往往能解决卡顿。
-        instancedMesh.frustumCulled = false;
-        
-        rocksGroup.add(instancedMesh);
-      });
-    });
-
-  }).catch(err => {
-    console.error("Error in loading models or placing objects:", err);
-  });
 
   // 粒子对象池
   const particlePool: Mesh[] = [];
@@ -683,16 +338,26 @@ export function createPlanetRenderer(input: {
   // 返回外部控制接口
   return {
     setDayCount(count: number) {
-      if (Math.floor(count) > Math.floor(dayCount)) {
+      const oldDayCount = dayCount;
+      if (Math.floor(count) > Math.floor(oldDayCount)) {
         triggerClickFeedback();
       }
       dayCount = count;
+      
+      // 使用阶段管理器更新阶段
+      if (stageManager) {
+        stageManager.update(dayCount);
+      }
     },
     dispose() {
       if (rafId != null) window.cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       controls.dispose();
       renderer.dispose();
+      // 清理阶段管理器
+      if (stageManager) {
+        stageManager.cleanup();
+      }
     },
   }
 }
