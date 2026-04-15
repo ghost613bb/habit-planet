@@ -78,8 +78,8 @@ class Stage2 implements Stage {
   private createVegetation(): void {
     // 灌木模型列表
     const bushModels = [
-      '/models/Bush_Common.gltf',
-      '/models/Bush_Common_Flowers.gltf'
+      '/models/bush/Bush_Common.gltf',
+      '/models/bush/Bush_Common_Flowers.gltf'
     ];
 
     // 创建灌木（5个）
@@ -109,8 +109,8 @@ class Stage2 implements Stage {
 
     // 创建额外的草丛（8个）
     const grassModels = [
-      '/models/grass_patch.gltf',
-      '/models/grass_patch_2.gltf'
+      '/models/grass/grass_patch.gltf',
+      '/models/grass/grass_patch_2.gltf'
     ];
 
     for (let i = 0; i < 8; i++) {
@@ -139,9 +139,9 @@ class Stage2 implements Stage {
   private createMoreRocks(): void {
     // 石头模型列表
     const rockModels = [
-      '/models/Rock_Medium_1.gltf',
-      '/models/Rock_Medium_2.gltf',
-      '/models/Rock_Medium_3.gltf'
+      '/models/rock/Rock_Medium_1.gltf',
+      '/models/rock/Rock_Medium_2.gltf',
+      '/models/rock/Rock_Medium_3.gltf'
     ];
 
     // 岩石颜色列表（岩灰色）
@@ -208,9 +208,9 @@ class Stage2 implements Stage {
   private createCampfire(): void {
     // 创建篝火（使用多个小石头围成一圈）
     const rockModels = [
-      '/models/Pebble_Round_1.gltf',
-      '/models/Pebble_Round_2.gltf',
-      '/models/Pebble_Round_3.gltf'
+      '/models/pebble/Pebble_Round_1.gltf',
+      '/models/pebble/Pebble_Round_2.gltf',
+      '/models/pebble/Pebble_Round_3.gltf'
     ];
 
     // 篝火位置
@@ -222,7 +222,7 @@ class Stage2 implements Stage {
       const randomModel = rockModels[Math.floor(Math.random() * rockModels.length)];
       this.gltfLoader.load(randomModel, (gltf) => {
         const rock = gltf.scene;
-        rock.scale.set(0.02, 0.02, 0.02);
+        rock.scale.set(8888, 0.08, 0.08);
 
         // 为石头设置默认颜色（深灰色）
         this.setDefaultMaterialColor(rock, '#505050');

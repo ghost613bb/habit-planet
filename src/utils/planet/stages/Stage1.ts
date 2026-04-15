@@ -70,7 +70,7 @@ class Stage1 implements Stage {
 
   private createFlower(): void {
     // 在星球顶部放置花模型
-    this.gltfLoader.load('/models/scene.gltf', (gltf) => {
+    this.gltfLoader.load('/models/flower/scene.gltf', (gltf) => {
       const flower = gltf.scene;
       flower.scale.set(0.3,0.3,0.3); // 调大花模型大小
 
@@ -88,9 +88,9 @@ class Stage1 implements Stage {
   private createRocks(count: number, heightRatio: number): void {
     // 石头模型列表
     const rockModels = [
-      '/models/Rock_Medium_1.gltf',
-      '/models/Rock_Medium_2.gltf',
-      '/models/Rock_Medium_3.gltf'
+      '/models/rock/Rock_Medium_1.gltf',
+      '/models/rock/Rock_Medium_2.gltf',
+      '/models/rock/Rock_Medium_3.gltf'
     ];
 
     // 岩石颜色列表（岩灰色）
@@ -144,8 +144,8 @@ class Stage1 implements Stage {
   private createGrass(): void {
     // 草模型列表
     const grassModels = [
-      '/models/grass_patch.gltf',
-      '/models/grass_patch_2.gltf'
+      '/models/grass/grass_patch.gltf',
+      '/models/grass/grass_patch_2.gltf'
     ];
 
     // 固定的草模型位置
