@@ -420,5 +420,4 @@ export function createPlanetRenderer(input: {
       renderer.dispose();
     },
   }
-  }
 }
