@@ -12,6 +12,7 @@ export interface LayerController {
   preload(): Promise<void>
   activate(input: LayerUpdateInput): Promise<void> | void
   update(input: LayerUpdateInput): void
+  tick?(elapsedMs: number): void
   deactivate(): void
   dispose(): void
 }

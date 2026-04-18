@@ -33,6 +33,11 @@ export function createLayerSceneController(options: LayerSceneControllerOptions)
   }
 
   return {
+    tick(elapsedMs: number) {
+      layers.forEach((layer) => {
+        layer.tick?.(elapsedMs)
+      })
+    },
     applySnapshot(snapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier }) {
       updateLayers(snapshot)
       if (snapshot.stageIndex >= 3) {

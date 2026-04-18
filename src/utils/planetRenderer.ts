@@ -32,11 +32,14 @@ import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
 import StageManager from './planet/stages'
+import { CharacterLayer } from './planet/layers/CharacterLayer'
+import { FinaleLayer } from './planet/layers/FinaleLayer'
 import { FxLayer } from './planet/layers/FxLayer'
 import { StructureLayer } from './planet/layers/StructureLayer'
 import { TerrainLayer } from './planet/layers/TerrainLayer'
 import { VegetationLayer } from './planet/layers/VegetationLayer'
 import { createLegacyStageSceneController } from './planet/runtime/legacyStageSceneController'
+import { downgradeQualityTier, resolveInitialQualityTier } from './planet/runtime/qualityTier'
 import { createLayerSceneController } from './planet/runtime/layerSceneController'
 import { createStageOrchestrator } from './planet/runtime/stageOrchestrator'
 
@@ -94,6 +97,10 @@ export function createPlanetRenderer(input: {
   let dayCount = initialDayCount
   let stageManager: StageManager;
   let replaySnapshotDayCount = initialDayCount
+  let currentQualityTier = resolveInitialQualityTier({
+    deviceMemory: (navigator as any).deviceMemory,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+  })
 
   // 引用对象 (Refs) 用于存储需要更新的场景物体
   const refs: any = {
@@ -263,11 +270,19 @@ export function createPlanetRenderer(input: {
     parentGroup: planetGroup,
     planetRadius,
   })
+  const characterLayer = new CharacterLayer({
+    parentGroup: planetGroup,
+    planetRadius,
+  })
+  const finaleLayer = new FinaleLayer({
+    parentGroup: planetGroup,
+    planetRadius,
+  })
   const layerSceneController = createLayerSceneController({
-    layers: [terrainLayer, vegetationLayer, structureLayer, fxLayer],
+    layers: [terrainLayer, vegetationLayer, structureLayer, fxLayer, characterLayer, finaleLayer],
     legacyController: legacySceneController,
   })
-  const orchestrator = createStageOrchestrator(layerSceneController)
+  const orchestrator = createStageOrchestrator(layerSceneController, currentQualityTier)
 
   // 粒子对象池
   const particlePool: Mesh[] = [];
@@ -310,12 +325,19 @@ export function createPlanetRenderer(input: {
   const _scaleTarget = new Vector3(1, 1, 1);
 
   let rafId: number;
+  let averageFrameMs = 16
+  let lastFrameTs = performance.now()
   function loop() {
     rafId = window.requestAnimationFrame(loop);
+    const now = performance.now()
+    const frameMs = now - lastFrameTs
+    lastFrameTs = now
     controls.update();
+    averageFrameMs = averageFrameMs * 0.92 + frameMs * 0.08
 
     // 简单的自转
     planetGroup.rotation.y += 0.0005;
+    layerSceneController.tick(now)
 
     // 简单的回弹动画
     if (refs.planetGroup && refs.planetGroup.scale.x > 1.001) {
@@ -335,6 +357,14 @@ export function createPlanetRenderer(input: {
         particlePool.push(p); // 回收粒子到对象池
         refs.particles.splice(i, 1);
       }
+    }
+
+    const nextQualityTier = downgradeQualityTier(currentQualityTier, {
+      avgFrameMs: averageFrameMs,
+    })
+    if (nextQualityTier !== currentQualityTier) {
+      currentQualityTier = nextQualityTier
+      orchestrator.setQualityTier(currentQualityTier)
     }
 
     renderer.render(scene, camera);
@@ -384,6 +414,8 @@ export function createPlanetRenderer(input: {
       vegetationLayer.dispose()
       structureLayer.dispose()
       fxLayer.dispose()
+      characterLayer.dispose()
+      finaleLayer.dispose()
       renderer.dispose();
       // 清理阶段管理器
       if (stageManager) {
