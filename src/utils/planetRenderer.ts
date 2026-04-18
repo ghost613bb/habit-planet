@@ -32,6 +32,8 @@ import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
 import StageManager from './planet/stages'
+import { FxLayer } from './planet/layers/FxLayer'
+import { StructureLayer } from './planet/layers/StructureLayer'
 import { TerrainLayer } from './planet/layers/TerrainLayer'
 import { VegetationLayer } from './planet/layers/VegetationLayer'
 import { createLegacyStageSceneController } from './planet/runtime/legacyStageSceneController'
@@ -253,8 +255,16 @@ export function createPlanetRenderer(input: {
     parentGroup: planetGroup,
     planetRadius,
   })
+  const structureLayer = new StructureLayer({
+    parentGroup: planetGroup,
+    planetRadius,
+  })
+  const fxLayer = new FxLayer({
+    parentGroup: planetGroup,
+    planetRadius,
+  })
   const layerSceneController = createLayerSceneController({
-    layers: [terrainLayer, vegetationLayer],
+    layers: [terrainLayer, vegetationLayer, structureLayer, fxLayer],
     legacyController: legacySceneController,
   })
   const orchestrator = createStageOrchestrator(layerSceneController)
@@ -372,6 +382,8 @@ export function createPlanetRenderer(input: {
       controls.dispose();
       terrainLayer.dispose()
       vegetationLayer.dispose()
+      structureLayer.dispose()
+      fxLayer.dispose()
       renderer.dispose();
       // 清理阶段管理器
       if (stageManager) {
