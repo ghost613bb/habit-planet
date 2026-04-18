@@ -19,7 +19,7 @@ export function setupLights(scene: Scene) {
 
   // 4. 新增：高光 (与主光源对齐，增强立体感)
   // 亮白色，集中照亮受光面
-  const spotLight = new SpotLight(0xffe6c1, 3000.0); // 强度高
+  const spotLight = new SpotLight(0xffe6c1, 1500.0); // 降低高光强度，避免受光面被过度洗白
   spotLight.position.set(10, 8, 8); // 与主光源位置一致，增强高光
   spotLight.target.position.set(0, 0, 0); // 指向星球中心
   spotLight.angle = Math.PI / 14; // 稍微扩大角度，覆盖更多受光面

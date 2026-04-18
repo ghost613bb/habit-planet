@@ -44,17 +44,35 @@ import { createStageOrchestrator } from './planet/runtime/stageOrchestrator'
 export type { Stage } from './planet/types'
 
 const PLANET_RADIUS_BASE = 3.0
+const MAX_RENDERER_PIXEL_RATIO = 2
+const TIER_PIXEL_RATIO_CAP: Record<'tier-0' | 'tier-1' | 'tier-2', number> = {
+  'tier-0': 1,
+  'tier-1': 1.5,
+  'tier-2': 2,
+}
+const TIER_TEXTURE_ANISOTROPY_CAP: Record<'tier-0' | 'tier-1' | 'tier-2', number> = {
+  'tier-0': 1,
+  'tier-1': 4,
+  'tier-2': 8,
+}
+let currentPlanetTextureAnisotropy = 1
 
 // --- 纹理加载 ---
 const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
 
+function applyPlanetTextureAnisotropy(texture: { anisotropy: number; needsUpdate: boolean }) {
+  if (texture.anisotropy === currentPlanetTextureAnisotropy) return
+  texture.anisotropy = currentPlanetTextureAnisotropy
+  texture.needsUpdate = true
+}
 
 // 加载压缩后的 JPG 纹理，使用浏览器硬件解码加速
 textureLoader.load('/textures/lroc_color_16bit_srgb_4k2.jpg', (texture) => {
   texture.colorSpace = SRGBColorSpace
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
+  applyPlanetTextureAnisotropy(texture)
   mats.planet.map = texture
   mats.planet.needsUpdate = true
 }, undefined, (err) => console.warn('Failed to load JPG color texture:', err))
@@ -62,9 +80,31 @@ textureLoader.load('/textures/lroc_color_16bit_srgb_4k2.jpg', (texture) => {
 textureLoader.load('/textures/ldem_16_uint2.jpg', (texture) => {
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
+  applyPlanetTextureAnisotropy(texture)
   mats.planet.displacementMap = texture
   mats.planet.needsUpdate = true
 }, undefined, (err) => console.warn('Failed to load JPG displacement texture:', err))
+
+function getTargetPixelRatio(qualityTier: 'tier-0' | 'tier-1' | 'tier-2') {
+  const devicePixelRatio = window.devicePixelRatio || 1
+  return Math.min(devicePixelRatio, TIER_PIXEL_RATIO_CAP[qualityTier], MAX_RENDERER_PIXEL_RATIO)
+}
+
+function syncPlanetTextureClarity(
+  renderer: WebGLRenderer,
+  qualityTier: 'tier-0' | 'tier-1' | 'tier-2',
+) {
+  renderer.setPixelRatio(getTargetPixelRatio(qualityTier))
+
+  const maxAnisotropy = renderer.capabilities.getMaxAnisotropy()
+  currentPlanetTextureAnisotropy = Math.min(maxAnisotropy, TIER_TEXTURE_ANISOTROPY_CAP[qualityTier])
+  const textures = [mats.planet.map, mats.planet.displacementMap]
+
+  textures.forEach((texture) => {
+    if (!texture) return
+    applyPlanetTextureAnisotropy(texture)
+  })
+}
 
 // --- 物体生成函数 ---
 
@@ -145,11 +185,8 @@ export function createPlanetRenderer(input: {
     depth: true
   })
   
-  // 优化：对于低端设备，强制使用 webgl1（如果浏览器初始化 webgl2 过慢）
-  // 虽然 Three.js 默认优先 webgl2，但在某些显卡驱动上获取 webgl2 上下文非常耗时
-  // 考虑到我们的项目不依赖 webgl2 的高级特性，这个参数可以加快 getContext 速度
-  // 严格限制像素比例为 1，配合抗锯齿，既能保证画质不闪烁，又能大幅降低高分屏的像素填充压力
-  renderer.setPixelRatio(1)
+  // 贴图清晰度按质量档动态限制，避免高分屏固定 1 倍像素比导致整体发糊
+  syncPlanetTextureClarity(renderer, currentQualityTier)
   renderer.outputColorSpace = SRGBColorSpace
   // 关闭阴影
   renderer.shadowMap.enabled = false
@@ -172,6 +209,29 @@ export function createPlanetRenderer(input: {
   // --- 初始化灯光 ---
   const lights = setupLights(scene)
   Object.assign(refs.lights, lights)
+  const baseLightIntensities = {
+    ambient: lights.ambientLight.intensity,
+    sun: lights.sunLight.intensity,
+    moon: lights.moonLight.intensity,
+    spot: lights.spotLight.intensity,
+  }
+
+  function updateDistanceAwareLighting() {
+    const distance = camera.position.distanceTo(controls.target)
+    const span = Math.max(0.001, controls.maxDistance - controls.minDistance)
+    const zoomRatio = Math.max(0, Math.min(1, (distance - controls.minDistance) / span))
+
+    // 相机越靠近星球，越收敛主光和高光，避免放大时把表面细节洗白。
+    const ambientFactor = 0.82 + zoomRatio * 0.18
+    const sunFactor = 0.72 + zoomRatio * 0.28
+    const moonFactor = 0.88 + zoomRatio * 0.12
+    const spotFactor = 0.18 + zoomRatio * 0.82
+
+    lights.ambientLight.intensity = baseLightIntensities.ambient * ambientFactor
+    lights.sunLight.intensity = baseLightIntensities.sun * sunFactor
+    lights.moonLight.intensity = baseLightIntensities.moon * moonFactor
+    lights.spotLight.intensity = baseLightIntensities.spot * spotFactor
+  }
 
   refs.starsPoints = createStars()
   scene.add(refs.starsPoints)
@@ -206,9 +266,9 @@ export function createPlanetRenderer(input: {
     
     for (let i = 0; i < positions.count; i++) {
       const idx = i * 3;
-      const vx = posArray[idx];
-      const vy = posArray[idx + 1];
-      const vz = posArray[idx + 2];
+      const vx = posArray[idx]!;
+      const vy = posArray[idx + 1]!;
+      const vz = posArray[idx + 2]!;
 
       let yScale = baseScaleY
       // 对上半球应用额外的压扁，模拟"顶部平坦"的效果
@@ -330,6 +390,7 @@ export function createPlanetRenderer(input: {
     lastFrameTs = now
     controls.update();
     averageFrameMs = averageFrameMs * 0.92 + frameMs * 0.08
+    updateDistanceAwareLighting()
 
     // 简单的自转
     planetGroup.rotation.y += 0.0005;
@@ -360,6 +421,7 @@ export function createPlanetRenderer(input: {
     })
     if (nextQualityTier !== currentQualityTier) {
       currentQualityTier = nextQualityTier
+      syncPlanetTextureClarity(renderer, currentQualityTier)
       input.onQualityTierChange?.(currentQualityTier)
       orchestrator.setQualityTier(currentQualityTier)
     }
