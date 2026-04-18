@@ -46,6 +46,7 @@ export class TerrainLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
+    const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const scaleByStage = {
       1: 0.2 + input.stageProgress * 0.25,
       2: 0.48 + input.stageProgress * 0.18,
@@ -56,6 +57,19 @@ export class TerrainLayer implements LayerController {
     }
 
     const nextScale = scaleByStage[input.stageIndex]
+    if (stageOneDay != null) {
+      // 第 1 天只出现幼苗；第 3 天才让顶部轻微泛绿，模拟草被刚长出来。
+      this.grassMesh.visible = stageOneDay >= 3
+      if (stageOneDay >= 3) {
+        this.grassMesh.scale.set(0.16, 0.13, 0.16)
+        this.grassMesh.material.color.set('#6f8350')
+      }
+
+      this.rocks.visible = stageOneDay >= 2
+      this.rocks.count = stageOneDay === 2 ? 2 : stageOneDay >= 3 ? 4 : 0
+      return
+    }
+
     this.grassMesh.visible = input.stageIndex >= 1
     this.grassMesh.scale.set(nextScale, nextScale, nextScale)
     this.grassMesh.material.color.set(
@@ -63,7 +77,7 @@ export class TerrainLayer implements LayerController {
     )
 
     this.rocks.visible = input.stageIndex <= 2
-    this.rocks.count = input.stageIndex === 1 ? 4 : 8
+    this.rocks.count = input.stageIndex === 2 ? 8 : 0
   }
 
   deactivate() {

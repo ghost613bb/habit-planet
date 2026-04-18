@@ -57,8 +57,16 @@ export class VegetationLayer implements LayerController {
 
     if (isLegacyStage) return
 
+    const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
+
     this.sprout.visible = true
-    this.sprout.scale.setScalar(0.55 + input.stageProgress * 0.45)
+    if (stageOneDay != null) {
+      // 第 1-3 天让幼苗有明确长高过程，便于用户一眼感知变化。
+      const stageOneSproutScale = stageOneDay === 1 ? 0.62 : stageOneDay === 2 ? 0.72 : 0.86
+      this.sprout.scale.setScalar(stageOneSproutScale)
+    } else {
+      this.sprout.scale.setScalar(0.55 + input.stageProgress * 0.45)
+    }
 
     const visibleBushCount = input.stageIndex === 1 ? 0 : 2 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.bushes.length; i += 1) {
