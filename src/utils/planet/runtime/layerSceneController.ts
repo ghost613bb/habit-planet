@@ -3,7 +3,7 @@ import type { PlanetQualityTier, StageRuntimeSnapshot } from '../types'
 
 type LayerSceneControllerOptions = {
   layers: LayerController[]
-  legacyController: {
+  legacyController?: {
     applySnapshot: (snapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier }) => void
     playMilestoneTransition: (
       fromSnapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier },
@@ -40,7 +40,7 @@ export function createLayerSceneController(options: LayerSceneControllerOptions)
     },
     applySnapshot(snapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier }) {
       updateLayers(snapshot)
-      if (snapshot.stageIndex >= 3) {
+      if (legacyController && snapshot.stageIndex >= 3) {
         legacyController.applySnapshot(snapshot)
       }
     },
@@ -49,13 +49,13 @@ export function createLayerSceneController(options: LayerSceneControllerOptions)
       toSnapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier },
     ) {
       updateLayers(toSnapshot)
-      if (toSnapshot.stageIndex >= 3) {
+      if (legacyController && toSnapshot.stageIndex >= 3) {
         legacyController.playMilestoneTransition(fromSnapshot, toSnapshot)
       }
     },
     jumpToSnapshot(snapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier }) {
       updateLayers(snapshot)
-      if (snapshot.stageIndex >= 3) {
+      if (legacyController && snapshot.stageIndex >= 3) {
         legacyController.jumpToSnapshot(snapshot)
       }
     },

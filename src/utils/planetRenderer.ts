@@ -31,14 +31,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
-import StageManager from './planet/stages'
 import { CharacterLayer } from './planet/layers/CharacterLayer'
 import { FinaleLayer } from './planet/layers/FinaleLayer'
 import { FxLayer } from './planet/layers/FxLayer'
 import { StructureLayer } from './planet/layers/StructureLayer'
 import { TerrainLayer } from './planet/layers/TerrainLayer'
 import { VegetationLayer } from './planet/layers/VegetationLayer'
-import { createLegacyStageSceneController } from './planet/runtime/legacyStageSceneController'
 import { downgradeQualityTier, resolveInitialQualityTier } from './planet/runtime/qualityTier'
 import { createLayerSceneController } from './planet/runtime/layerSceneController'
 import { createStageOrchestrator } from './planet/runtime/stageOrchestrator'
@@ -95,7 +93,6 @@ export function createPlanetRenderer(input: {
   const { canvas, dayCount: initialDayCount, timeOfDay = 12 } = input
   const host = input.host ?? (canvas.parentElement as HTMLDivElement)
   let dayCount = initialDayCount
-  let stageManager: StageManager;
   let replaySnapshotDayCount = initialDayCount
   let currentQualityTier = resolveInitialQualityTier({
     deviceMemory: (navigator as any).deviceMemory,
@@ -250,9 +247,7 @@ export function createPlanetRenderer(input: {
   refs.grassMesh.visible = false
   planetGroup.add(refs.grassMesh)
 
-  // 初始化阶段管理器和过渡场景编排器
-  stageManager = new StageManager(scene, planetGroup)
-  const legacySceneController = createLegacyStageSceneController(stageManager)
+  // 初始化分层场景编排器
   const terrainLayer = new TerrainLayer({
     parentGroup: planetGroup,
     grassMesh: refs.grassMesh,
@@ -280,7 +275,6 @@ export function createPlanetRenderer(input: {
   })
   const layerSceneController = createLayerSceneController({
     layers: [terrainLayer, vegetationLayer, structureLayer, fxLayer, characterLayer, finaleLayer],
-    legacyController: legacySceneController,
   })
   const orchestrator = createStageOrchestrator(layerSceneController, currentQualityTier)
 
@@ -385,6 +379,7 @@ export function createPlanetRenderer(input: {
 
   // 启动
   // updateTimeOfDay(12)
+  orchestrator.update(dayCount)
   rafId = window.requestAnimationFrame(loop)
 
   // 返回外部控制接口
@@ -417,10 +412,7 @@ export function createPlanetRenderer(input: {
       characterLayer.dispose()
       finaleLayer.dispose()
       renderer.dispose();
-      // 清理阶段管理器
-      if (stageManager) {
-        stageManager.cleanup();
-      }
     },
+  }
   }
 }
