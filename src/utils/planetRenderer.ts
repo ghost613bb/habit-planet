@@ -32,19 +32,12 @@ import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
 import StageManager from './planet/stages'
+import { createLegacyStageSceneController } from './planet/runtime/legacyStageSceneController'
+import { createStageOrchestrator } from './planet/runtime/stageOrchestrator'
 
 export type { Stage } from './planet/types'
 
 const PLANET_RADIUS_BASE = 3.0
-
-// 阶段阈值常量
-const STAGE_THRESHOLDS = {
-  T1: 4,    // 阶段1结束，进入阶段2
-  T2: 11,   // 阶段2结束，进入阶段3
-  T3: 22,   // 阶段3结束，进入阶段4
-  T4: 46,   // 阶段4结束，进入阶段5
-  T5: 91    // 阶段5结束，进入阶段6
-};
 
 // --- 纹理加载 ---
 const textureLoader = new TextureLoader()
@@ -95,6 +88,7 @@ export function createPlanetRenderer(input: {
   const host = input.host ?? (canvas.parentElement as HTMLDivElement)
   let dayCount = initialDayCount
   let stageManager: StageManager;
+  let replaySnapshotDayCount = initialDayCount
 
   // 引用对象 (Refs) 用于存储需要更新的场景物体
   const refs: any = {
@@ -178,6 +172,8 @@ export function createPlanetRenderer(input: {
 
   // 初始化阶段管理器
   stageManager = new StageManager(scene, planetGroup)
+  const legacySceneController = createLegacyStageSceneController(stageManager)
+  const orchestrator = createStageOrchestrator(legacySceneController)
 
   const planetRadius = PLANET_RADIUS_BASE
   const grassRadius = 3.05
@@ -343,11 +339,16 @@ export function createPlanetRenderer(input: {
         triggerClickFeedback();
       }
       dayCount = count;
-      
-      // 使用阶段管理器更新阶段
-      if (stageManager) {
-        stageManager.update(dayCount);
-      }
+      replaySnapshotDayCount = dayCount
+      orchestrator.update(dayCount)
+    },
+    jumpToDayCount(count: number) {
+      dayCount = count
+      replaySnapshotDayCount = dayCount
+      orchestrator.jump(dayCount)
+    },
+    replayCurrentTransition() {
+      orchestrator.jump(replaySnapshotDayCount)
     },
     dispose() {
       if (rafId != null) window.cancelAnimationFrame(rafId);
