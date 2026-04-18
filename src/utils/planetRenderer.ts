@@ -32,7 +32,10 @@ import { SeededRandom, getSurfaceTransform } from './planet/math/PlanetMath'
 import { mats } from './planet/assets/Materials'
 import { setupLights } from './planet/core/Lights'
 import StageManager from './planet/stages'
+import { TerrainLayer } from './planet/layers/TerrainLayer'
+import { VegetationLayer } from './planet/layers/VegetationLayer'
 import { createLegacyStageSceneController } from './planet/runtime/legacyStageSceneController'
+import { createLayerSceneController } from './planet/runtime/layerSceneController'
 import { createStageOrchestrator } from './planet/runtime/stageOrchestrator'
 
 export type { Stage } from './planet/types'
@@ -170,11 +173,6 @@ export function createPlanetRenderer(input: {
   scene.add(planetGroup)
   refs.planetGroup = planetGroup
 
-  // 初始化阶段管理器
-  stageManager = new StageManager(scene, planetGroup)
-  const legacySceneController = createLegacyStageSceneController(stageManager)
-  const orchestrator = createStageOrchestrator(legacySceneController)
-
   const planetRadius = PLANET_RADIUS_BASE
   const grassRadius = 3.05
 
@@ -242,6 +240,24 @@ export function createPlanetRenderer(input: {
   refs.grassMesh.scale.set(0.01, 0.01, 0.01)
   refs.grassMesh.visible = false
   planetGroup.add(refs.grassMesh)
+
+  // 初始化阶段管理器和过渡场景编排器
+  stageManager = new StageManager(scene, planetGroup)
+  const legacySceneController = createLegacyStageSceneController(stageManager)
+  const terrainLayer = new TerrainLayer({
+    parentGroup: planetGroup,
+    grassMesh: refs.grassMesh,
+    planetRadius,
+  })
+  const vegetationLayer = new VegetationLayer({
+    parentGroup: planetGroup,
+    planetRadius,
+  })
+  const layerSceneController = createLayerSceneController({
+    layers: [terrainLayer, vegetationLayer],
+    legacyController: legacySceneController,
+  })
+  const orchestrator = createStageOrchestrator(layerSceneController)
 
   // 粒子对象池
   const particlePool: Mesh[] = [];
@@ -354,6 +370,8 @@ export function createPlanetRenderer(input: {
       if (rafId != null) window.cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       controls.dispose();
+      terrainLayer.dispose()
+      vegetationLayer.dispose()
       renderer.dispose();
       // 清理阶段管理器
       if (stageManager) {
