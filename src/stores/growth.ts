@@ -51,7 +51,13 @@ function extractDayCount(payload: unknown): number | null {
 }
 
 // 定义生长阶段的ID类型
-export type GrowthStageId = 'origin' | 'awakening' | 'vibrant' | 'civilization' | 'resonance'
+export type GrowthStageId =
+  | 'origin'
+  | 'campfire'
+  | 'shelter'
+  | 'homestead'
+  | 'flourish'
+  | 'finale'
 
 // 定义植被配置类型，控制不同阶段的植物数量
 export type VegetationConfig = {
@@ -74,43 +80,50 @@ export type GrowthStage = {
 export const growthStages: GrowthStage[] = [
   {
     id: 'origin',
-    name: '荒芜原点',
+    name: '萌芽初启',
     threshold: 0,
-    description: '沉睡的岩石',
-    vegetation: { grass: 0, flowers: 0, bushes: 0, trees: 0 },
+    description: '幼苗刚刚破土',
+    vegetation: { grass: 60, flowers: 4, bushes: 0, trees: 0 },
   },
   {
-    id: 'awakening',
-    name: '苏醒时刻',
-    threshold: 3,
-    description: '第一抹绿色',
-    vegetation: { grass: 120, flowers: 10, bushes: 0, trees: 2 },
+    id: 'campfire',
+    name: '篝火升起',
+    threshold: 4,
+    description: '灌木与篝火点亮家园',
+    vegetation: { grass: 120, flowers: 10, bushes: 8, trees: 2 },
   },
   {
-    id: 'vibrant',
-    name: '生机勃发',
-    threshold: 10,
-    description: '森林的呼吸',
-    vegetation: { grass: 380, flowers: 40, bushes: 20, trees: 15 },
+    id: 'shelter',
+    name: '家园雏形',
+    threshold: 11,
+    description: '土路与木屋骨架出现',
+    vegetation: { grass: 220, flowers: 24, bushes: 18, trees: 4 },
   },
   {
-    id: 'civilization',
-    name: '文明火种',
+    id: 'homestead',
+    name: '温暖家园',
     threshold: 22,
-    description: '温暖的归属',
-    vegetation: { grass: 520, flowers: 90, bushes: 60, trees: 25 },
+    description: '小屋、风车与光轨点亮场景',
+    vegetation: { grass: 360, flowers: 48, bushes: 24, trees: 6 },
   },
   {
-    id: 'resonance',
-    name: '星际共鸣',
-    threshold: 35,
-    description: '灵魂的羁绊',
-    vegetation: { grass: 650, flowers: 140, bushes: 120, trees: 40 },
+    id: 'flourish',
+    name: '繁盛之境',
+    threshold: 46,
+    description: '植被茂盛，长椅与秋千加入',
+    vegetation: { grass: 520, flowers: 82, bushes: 38, trees: 8 },
+  },
+  {
+    id: 'finale',
+    name: '生命共鸣',
+    threshold: 91,
+    description: '生命树、光环与星尘展开',
+    vegetation: { grass: 620, flowers: 120, bushes: 52, trees: 10 },
   },
 ]
 
 // 最大的天数阈值
-const maxThreshold = 50 
+const maxThreshold = 120
 
 // 定义 Pinia Store，用于管理生长的状态
 export const useGrowthStore = defineStore('growth', {

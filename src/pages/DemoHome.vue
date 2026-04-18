@@ -12,9 +12,11 @@
     <!-- 3D 场景容器 -->
     <main class="stage">
       <PlanetCanvas
+        ref="canvasRef"
         :stages="store.stages"
         :stage-index="store.stageIndex"
-        :day-count="store.value" />
+        :day-count="store.value"
+        @quality-tier-change="onQualityTierChange" />
     </main>
 
     <!-- 进度控制面板 (保留用于调试/演示) -->
@@ -47,6 +49,11 @@
           重置
         </button>
       </div>
+      <PlanetDebugPanel
+        :current-day="Math.round(store.value)"
+        :max-day="store.maxValue"
+        @jump-day="onDebugJump"
+        @replay-transition="replayCurrentTransition" />
     </div>
 
     <!-- 底部 UI：计数器和打卡按钮 -->
@@ -74,9 +81,17 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 const PlanetCanvas = defineAsyncComponent(() => import('@/components/PlanetCanvas.vue'))
+const PlanetDebugPanel = defineAsyncComponent(() => import('@/components/PlanetDebugPanel.vue'))
 import { useGrowthStore } from '@/stores/growth'
+import { usePlanetDebugStore } from '@/stores/planetDebug'
 
 const store = useGrowthStore()
+const debugStore = usePlanetDebugStore()
+const canvasRef = ref<{
+  jumpToDayCount: (dayCount: number) => void
+  replayCurrentTransition: () => void
+  getQualityTier: () => 'tier-0' | 'tier-1' | 'tier-2'
+} | null>(null)
 
 // 控制阶段徽章的动画显示
 const stageBadgeVisible = ref(true)
@@ -121,6 +136,20 @@ function onSlider(e: Event) {
   store.setValue(next)
 }
 
+function onDebugJump(dayCount: number) {
+  store.pause()
+  debugStore.setCustomDayCount(dayCount)
+  store.setValue(dayCount)
+}
+
+function replayCurrentTransition() {
+  canvasRef.value?.replayCurrentTransition()
+}
+
+function onQualityTierChange(qualityTier: 'tier-0' | 'tier-1' | 'tier-2') {
+  debugStore.setQualityTier(qualityTier)
+}
+
 // 动画循环逻辑
 let rafId: number | null = null
 let lastTs = performance.now()
@@ -133,6 +162,7 @@ const loop = (ts: number) => {
 }
 
 onMounted(() => {
+  store.installDayCountBridge()
   lastTs = performance.now()
   rafId = window.requestAnimationFrame(loop)
 })
@@ -142,6 +172,7 @@ onBeforeUnmount(() => {
   rafId = null
   if (stageBadgeTimer != null) window.clearTimeout(stageBadgeTimer)
   stageBadgeTimer = null
+  store.disposeDayCountBridge()
 })
 </script>
 

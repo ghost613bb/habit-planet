@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch, markRaw } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Stage } from '@/utils/planetRenderer'
 import { createPlanetRenderer } from '@/utils/planetRenderer'
 
@@ -18,6 +18,10 @@ const props = defineProps<{
   stages: Stage[] // 生长阶段配置数据
   stageIndex: number // 当前阶段索引
   dayCount: number // 当前天数/进度
+}>()
+
+const emit = defineEmits<{
+  (e: 'quality-tier-change', qualityTier: 'tier-0' | 'tier-1' | 'tier-2'): void
 }>()
 
 // 绑定 DOM 元素
@@ -47,9 +51,24 @@ onMounted(() => {
     dayCount: props.dayCount,
     stages: props.stages,
     stageIndex: props.stageIndex,
+    onQualityTierChange: (qualityTier) => {
+      emit('quality-tier-change', qualityTier)
+    },
   })
   // 初始化时同步一次数据
   renderer.setDayCount(props.dayCount)
+})
+
+defineExpose({
+  jumpToDayCount(dayCount: number) {
+    renderer?.jumpToDayCount(dayCount)
+  },
+  replayCurrentTransition() {
+    renderer?.replayCurrentTransition()
+  },
+  getQualityTier() {
+    return renderer?.getQualityTier() ?? 'tier-1'
+  },
 })
 
 // 组件卸载时销毁渲染器，释放资源

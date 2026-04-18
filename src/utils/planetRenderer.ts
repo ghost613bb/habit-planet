@@ -89,6 +89,7 @@ export function createPlanetRenderer(input: {
   timeOfDay?: number
   stages?: unknown
   stageIndex?: number
+  onQualityTierChange?: (qualityTier: 'tier-0' | 'tier-1' | 'tier-2') => void
 }) {
   const { canvas, dayCount: initialDayCount, timeOfDay = 12 } = input
   const host = input.host ?? (canvas.parentElement as HTMLDivElement)
@@ -98,6 +99,7 @@ export function createPlanetRenderer(input: {
     deviceMemory: (navigator as any).deviceMemory,
     hardwareConcurrency: navigator.hardwareConcurrency,
   })
+  input.onQualityTierChange?.(currentQualityTier)
 
   // 引用对象 (Refs) 用于存储需要更新的场景物体
   const refs: any = {
@@ -358,6 +360,7 @@ export function createPlanetRenderer(input: {
     })
     if (nextQualityTier !== currentQualityTier) {
       currentQualityTier = nextQualityTier
+      input.onQualityTierChange?.(currentQualityTier)
       orchestrator.setQualityTier(currentQualityTier)
     }
 
@@ -400,6 +403,9 @@ export function createPlanetRenderer(input: {
     },
     replayCurrentTransition() {
       orchestrator.jump(replaySnapshotDayCount)
+    },
+    getQualityTier() {
+      return currentQualityTier
     },
     dispose() {
       if (rafId != null) window.cancelAnimationFrame(rafId);
