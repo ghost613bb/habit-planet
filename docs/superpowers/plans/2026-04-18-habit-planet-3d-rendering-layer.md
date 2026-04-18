@@ -52,6 +52,15 @@
 - `src/stores/planetDebug.test.ts`
 - `src/stores/growth.test.ts`
 
+## Asset Selection Guardrails
+
+- 大面积生态不允许用重复 `GLTF` 堆叠解决，尤其是草被、花海和地表覆盖。
+- `grass cover`、`energy ring`、`halo`、`stardust` 必须优先走材质层、贴图混合、实例化 patch 或程序化特效。
+- 单独找模型只服务于英雄资产，优先级为：`campfire`、`hut-full`、`windmill`、`rabbit`、`life-tree`。
+- `hut-skeleton`、`bench`、`swing` 默认先用低模几何体拼接，不把外部模型搜寻作为前置依赖。
+- 现有 `rock`、`bush`、`stylized_tree`、`flower` 只允许少量点缀或实例化复用，禁止无上限克隆。
+- 如果某个模型同时满足“效果差、面数偏高、节点深、难复用”，应直接从 manifest 中移除，而不是继续适配。
+
 ### Task 1: 阶段运行时与质量档基础
 
 **Files:**
@@ -246,12 +255,12 @@ export const habitPlanetManifest = {
     6: { cameraPreset: 'finale', layers: ['terrain', 'vegetation', 'structure', 'character', 'fx', 'finale'], heroIds: ['life-tree'] },
   },
   assets: [
-    { id: 'sprout', scope: 'hero', stages: [1], preloadAt: [1], degradeTo: null },
-    { id: 'campfire', scope: 'hero', stages: [2], preloadAt: [2], degradeTo: null },
-    { id: 'hut-skeleton', scope: 'hero', stages: [3], preloadAt: [2, 3], degradeTo: null },
-    { id: 'windmill', scope: 'hero', stages: [4, 5, 6], preloadAt: [4], degradeTo: 'windmill-static' },
-    { id: 'butterfly-fx', scope: 'optional-fx', stages: [5], preloadAt: [5], degradeTo: null },
-    { id: 'life-tree', scope: 'hero', stages: [6], preloadAt: [5, 6], degradeTo: 'glow-tree-basic' },
+    { id: 'sprout', scope: 'hero', stages: [1], preloadAt: [1], source: 'existing-reuse', degradeTo: null },
+    { id: 'campfire', scope: 'hero', stages: [2], preloadAt: [2], source: 'procedural-kitbash', degradeTo: null },
+    { id: 'hut-skeleton', scope: 'hero', stages: [3], preloadAt: [2, 3], source: 'procedural-kitbash', degradeTo: null },
+    { id: 'windmill', scope: 'hero', stages: [4, 5, 6], preloadAt: [4], source: 'required-model', degradeTo: 'windmill-static' },
+    { id: 'butterfly-fx', scope: 'optional-fx', stages: [5], preloadAt: [5], source: 'procedural-fx', degradeTo: null },
+    { id: 'life-tree', scope: 'hero', stages: [6], preloadAt: [5, 6], source: 'required-model', degradeTo: 'glow-tree-basic' },
   ],
 } as const
 ```
@@ -517,8 +526,9 @@ export class TerrainLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
-    this.grassMesh.visible = input.stageIndex >= 1
-    this.grassMesh.scale.setScalar(0.2 + input.stageProgress * 0.8)
+    this.grassCoverMaterial.uniforms.coverage.value = input.stageIndex >= 1 ? 0.2 + input.stageProgress * 0.8 : 0
+    this.grassPatchInstances.visible = input.stageIndex >= 1
+    this.grassPatchInstances.count = input.stageIndex >= 3 ? 24 : 8
     this.pathMesh.visible = input.stageIndex >= 3
     this.pathMaterial.opacity = input.stageIndex >= 3 ? 0.35 + input.stageProgress * 0.45 : 0
   }
@@ -535,9 +545,21 @@ export class VegetationLayer implements LayerController {
     this.setSproutVisible(input.stageIndex === 1)
     this.setBushCount(input.stageIndex >= 2 ? 6 + Math.round(input.stageProgress * 8) : 0)
     this.setTreeCount(input.stageIndex >= 2 ? Math.min(input.stageIndex + 1, 4) : 0)
-    this.setFlowerDensity(input.stageIndex >= 3 ? 0.4 + input.stageProgress * 0.5 : 0.15)
+    this.setFlowerPatchCount(input.stageIndex >= 3 ? 6 + Math.round(input.stageProgress * 10) : 2)
     this.setMainTreeMode(input.stageIndex === 6 ? 'life-tree' : 'default-tree')
   }
+}
+```
+
+- [ ] **Step 4.1: 明确草被与花海不走重复 GLTF 方案**
+
+```ts
+// 禁止：for (let i = 0; i < 300; i++) loader.load('/models/grass/scene.gltf', ...)
+// 允许：材质覆盖 + 少量 patch 实例化 + 英雄机位前景点缀
+const vegetationBudget = {
+  grassPatchInstances: 24,
+  flowerPatchInstances: 16,
+  heroForegroundClusters: 6,
 }
 ```
 
@@ -671,12 +693,22 @@ export class FinaleLayer implements LayerController {
 }
 ```
 
+- [ ] **Step 4.1: 把终局氛围明确写成程序化增强，而不是强依赖模型**
+
+```ts
+const finaleFxPolicy = {
+  halo: 'procedural-ring',
+  stardust: 'points-particle-system',
+  treeGlow: 'emissive-material-upgrade',
+}
+```
+
 - [ ] **Step 5: 扩充 manifest 和 registry，明确英雄资产不能被降级移除**
 
 ```ts
-{ id: 'life-tree', scope: 'hero', stages: [6], preloadAt: [5, 6], degradeTo: 'glow-tree-basic' },
-{ id: 'stardust-fx', scope: 'optional-fx', stages: [6], preloadAt: [6], degradeTo: null },
-{ id: 'butterfly-fx', scope: 'optional-fx', stages: [5, 6], preloadAt: [5], degradeTo: null },
+{ id: 'life-tree', scope: 'hero', stages: [6], preloadAt: [5, 6], source: 'required-model', degradeTo: 'glow-tree-basic' },
+{ id: 'stardust-fx', scope: 'optional-fx', stages: [6], preloadAt: [6], source: 'procedural-fx', degradeTo: null },
+{ id: 'butterfly-fx', scope: 'optional-fx', stages: [5, 6], preloadAt: [5], source: 'procedural-fx', degradeTo: null },
 ```
 
 ```ts
@@ -932,7 +964,7 @@ git commit -m "chore: finalize 3d rendering layer migration"
 - Debug 模式设计：Task 6 覆盖走查面板、本地覆盖模式、重播过渡和恢复真实值。
 
 **Placeholder scan**
-- 未使用 `TODO`、`TBD`、`后续补`、`类似上一任务` 等占位写法。
+- 未使用占位词、延后补写说明或引用式省略写法。
 - 每个任务都给出具体文件路径、测试命令、预期输出和最小代码骨架。
 
 **Type consistency**
