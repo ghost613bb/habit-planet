@@ -1,4 +1,4 @@
-import { Group, Mesh, MeshLambertMaterial, SphereGeometry, Vector3 } from 'three'
+import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { getPlanetGrassOverlayState, mats, resetPlanetGrassOverlay } from '../assets/Materials'
@@ -66,5 +66,73 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(sprout.visible).toBe(true)
     expect(sprout.renderOrder).toBe(3)
     expect(sprout.position.length()).toBeGreaterThan(grassSurfaceHeight)
+  })
+
+  it('阶段 1 的草簇只在第 2 天开始出现，并在第 3 天继续增多', () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    const dayOneInput = {
+      dayCount: 1,
+      stageIndex: 1 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    }
+    const dayTwoInput = {
+      dayCount: 2,
+      stageIndex: 1 as const,
+      stageProgress: 0.5,
+      qualityTier: 'tier-1' as const,
+    }
+    const dayThreeInput = {
+      dayCount: 3,
+      stageIndex: 1 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    }
+
+    const getVisibleGrassCount = () => {
+      const grassPatches = (vegetationLayer as any).grassPatches as Object3D[]
+      return grassPatches.filter((item) => item.visible).length
+    }
+
+    vegetationLayer.update(dayOneInput)
+    expect(getVisibleGrassCount()).toBe(0)
+
+    vegetationLayer.update(dayTwoInput)
+    expect(getVisibleGrassCount()).toBeGreaterThanOrEqual(2)
+    expect(getVisibleGrassCount()).toBeLessThanOrEqual(3)
+
+    vegetationLayer.update(dayThreeInput)
+    expect(getVisibleGrassCount()).toBeGreaterThanOrEqual(5)
+    expect(getVisibleGrassCount()).toBeLessThanOrEqual(7)
+  })
+
+  it('阶段 1 草簇保持低于幼苗的视觉主次关系', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    vegetationLayer.update({
+      dayCount: 3,
+      stageIndex: 1 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+
+    await vegetationLayer.preload()
+
+    const sprout = (vegetationLayer as any).sprout as Group
+    const grassPatches = (vegetationLayer as any).grassPatches as Group[]
+    const visiblePatch = grassPatches.find((item) => item.visible)
+
+    expect(visiblePatch).toBeDefined()
+    expect((visiblePatch?.scale.y ?? 0)).toBeLessThan(sprout.scale.y)
+    expect(visiblePatch?.position.length() ?? 0).toBeLessThan(sprout.position.length())
   })
 })

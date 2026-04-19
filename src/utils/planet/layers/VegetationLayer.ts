@@ -2,10 +2,12 @@ import {
   ConeGeometry,
   CylinderGeometry,
   Group,
+  LoadingManager,
   Mesh,
   SphereGeometry,
   Vector3,
 } from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
 import { getPlacementTransform } from '../math/PlanetMath'
@@ -25,6 +27,10 @@ export class VegetationLayer implements LayerController {
   private sprout: Group
   private bushes: Group[] = []
   private trees: Group[] = []
+  private grassPatches: Group[] = []
+  private grassPatchTemplate: Group | null = null
+  private grassPatchLoader = new GLTFLoader(new LoadingManager())
+  private grassPatchLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -41,10 +47,43 @@ export class VegetationLayer implements LayerController {
 
     this.trees = this.createTrees()
     this.trees.forEach((item) => this.group.add(item))
+
+    this.grassPatches = this.createGrassPatchAnchors()
+    this.grassPatches.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
-    return Promise.resolve()
+    if (this.grassPatchLoadPromise) return this.grassPatchLoadPromise
+
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      this.grassPatchTemplate = new Group()
+      this.attachGrassPatchInstances()
+      this.grassPatchLoadPromise = Promise.resolve()
+      return this.grassPatchLoadPromise
+    }
+
+    const grassPatchUrl =
+      typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+        ? new URL('/models/grass_patches/scene.gltf', globalThis.location.origin).toString()
+        : '/models/grass_patches/scene.gltf'
+
+    this.grassPatchLoadPromise = new Promise((resolve, reject) => {
+      this.grassPatchLoader.load(
+        grassPatchUrl,
+        (gltf) => {
+          this.grassPatchTemplate = gltf.scene.clone(true)
+          this.attachGrassPatchInstances()
+          resolve()
+        },
+        undefined,
+        reject,
+      )
+    })
+
+    return this.grassPatchLoadPromise
   }
 
   activate(input: LayerUpdateInput) {
@@ -68,6 +107,15 @@ export class VegetationLayer implements LayerController {
       this.sprout.scale.setScalar(0.55 + input.stageProgress * 0.45)
     }
 
+    const visibleGrassPatchCount =
+      stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 3 : 6
+
+    for (let i = 0; i < this.grassPatches.length; i += 1) {
+      const patch = this.grassPatches[i]
+      if (!patch) continue
+      patch.visible = i < visibleGrassPatchCount
+    }
+
     const visibleBushCount = input.stageIndex === 1 ? 0 : 2 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.bushes.length; i += 1) {
       const bush = this.bushes[i]
@@ -87,6 +135,9 @@ export class VegetationLayer implements LayerController {
 
   deactivate() {
     this.group.visible = false
+    this.grassPatches.forEach((patch) => {
+      patch.visible = false
+    })
   }
 
   dispose() {
@@ -173,6 +224,45 @@ export class VegetationLayer implements LayerController {
       tree.visible = false
 
       return tree
+    })
+  }
+
+  private createGrassPatchAnchors() {
+    const anchors = [
+      { phi: 0.07, theta: 0.15, scale: 0.2 },
+      { phi: 0.09, theta: 0.95, scale: 0.18 },
+      { phi: 0.11, theta: 1.85, scale: 0.22 },
+      { phi: 0.16, theta: 0.5, scale: 0.19 },
+      { phi: 0.18, theta: 1.45, scale: 0.24 },
+      { phi: 0.2, theta: 2.35, scale: 0.21 },
+      { phi: 0.13, theta: 5.55, scale: 0.17 },
+    ]
+
+    return anchors.map((anchor, index) => {
+      const patch = new Group()
+      const { pos, quaternion } = getPlacementTransform(
+        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+        this.planetRadius,
+        'grassLayer',
+      )
+
+      patch.position.copy(pos)
+      patch.quaternion.copy(quaternion)
+      patch.scale.setScalar(anchor.scale + index * 0.005)
+      patch.visible = false
+
+      return patch
+    })
+  }
+
+  private attachGrassPatchInstances() {
+    this.grassPatches.forEach((patch, index) => {
+      patch.clear()
+      if (!this.grassPatchTemplate) return
+
+      const instance = this.grassPatchTemplate.clone(true)
+      instance.rotation.y = index * 0.9
+      patch.add(instance)
     })
   }
 }
