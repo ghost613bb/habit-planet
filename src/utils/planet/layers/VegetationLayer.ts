@@ -110,6 +110,11 @@ export class VegetationLayer implements LayerController {
     const visibleGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 3 : 6
 
+    if (visibleGrassPatchCount > 0) {
+      // 真实运行链路不会手动调用 preload，这里在草簇首次需要显示时懒加载一次。
+      void this.preload()
+    }
+
     for (let i = 0; i < this.grassPatches.length; i += 1) {
       const patch = this.grassPatches[i]
       if (!patch) continue

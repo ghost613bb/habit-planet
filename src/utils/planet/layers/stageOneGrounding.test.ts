@@ -111,6 +111,29 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(getVisibleGrassCount()).toBeLessThanOrEqual(7)
   })
 
+  it('阶段 1 草簇在真实运行链路里只调用 update 也会触发加载', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    vegetationLayer.update({
+      dayCount: 3,
+      stageIndex: 1 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+
+    await Promise.resolve()
+
+    const grassPatches = (vegetationLayer as any).grassPatches as Group[]
+    const visiblePatch = grassPatches.find((item) => item.visible)
+
+    expect(visiblePatch).toBeDefined()
+    expect(visiblePatch?.children.length ?? 0).toBeGreaterThan(0)
+  })
+
   it('阶段 1 草簇保持低于幼苗的视觉主次关系', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
