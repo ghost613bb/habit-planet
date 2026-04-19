@@ -3,12 +3,13 @@ import {
   Group,
   InstancedMesh,
   Matrix4,
+  MeshLambertMaterial,
   Mesh,
   Vector3,
 } from 'three'
 
-import { mats } from '../assets/Materials'
-import { getSurfaceTransform } from '../math/PlanetMath'
+import { mats, resetPlanetGrassOverlay, setPlanetGrassOverlay } from '../assets/Materials'
+import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
 type TerrainLayerOptions = {
@@ -33,7 +34,16 @@ export class TerrainLayer implements LayerController {
     this.rocks = new InstancedMesh(new DodecahedronGeometry(0.14, 0), mats.rockInstanced, 8)
     this.rocks.visible = false
     this.rocks.count = 8
+    this.rocks.renderOrder = 2
     this.buildRockMatrices()
+
+    const grassMaterial = this.grassMesh.material as MeshLambertMaterial
+    // 草层只负责给地表染绿，不再写入深度，避免把幼苗和石头压在下面。
+    grassMaterial.depthWrite = false
+    grassMaterial.polygonOffset = true
+    grassMaterial.polygonOffsetFactor = 1
+    grassMaterial.polygonOffsetUnits = 1
+    this.grassMesh.renderOrder = 0
     this.parentGroup.add(this.rocks)
   }
 
@@ -46,6 +56,7 @@ export class TerrainLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
+    const grassMaterial = this.grassMesh.material as MeshLambertMaterial
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const scaleByStage = {
       1: 0.2 + input.stageProgress * 0.25,
@@ -59,10 +70,19 @@ export class TerrainLayer implements LayerController {
     const nextScale = scaleByStage[input.stageIndex]
     if (stageOneDay != null) {
       // 第 1 天只出现幼苗；第 3 天才让顶部轻微泛绿，模拟草被刚长出来。
-      this.grassMesh.visible = stageOneDay >= 3
+      this.grassMesh.visible = false
       if (stageOneDay >= 3) {
-        this.grassMesh.scale.set(0.16, 0.13, 0.16)
-        this.grassMesh.material.color.set('#6f8350')
+        setPlanetGrassOverlay({
+          strength: 0.9,
+          radius: 1.02,
+          feather: 0.28,
+          topStart: 0.7,
+          topEnd: 0.9,
+          irregularity: 0.1,
+          color: '#7b9452',
+        })
+      } else {
+        resetPlanetGrassOverlay()
       }
 
       this.rocks.visible = stageOneDay >= 2
@@ -70,9 +90,10 @@ export class TerrainLayer implements LayerController {
       return
     }
 
+    resetPlanetGrassOverlay()
     this.grassMesh.visible = input.stageIndex >= 1
     this.grassMesh.scale.set(nextScale, nextScale, nextScale)
-    this.grassMesh.material.color.set(
+    grassMaterial.color.set(
       input.stageIndex >= 5 ? '#86a95d' : input.stageIndex >= 3 ? '#7e9460' : '#6b7045',
     )
 
@@ -82,10 +103,12 @@ export class TerrainLayer implements LayerController {
 
   deactivate() {
     this.grassMesh.visible = false
+    resetPlanetGrassOverlay()
     this.rocks.visible = false
   }
 
   dispose() {
+    resetPlanetGrassOverlay()
     this.parentGroup.remove(this.rocks)
     this.rocks.geometry.dispose()
   }
@@ -104,7 +127,7 @@ export class TerrainLayer implements LayerController {
 
     anchors.forEach((anchor, index) => {
       const normal = new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta)
-      const { pos, quaternion } = getSurfaceTransform(normal, this.planetRadius + 0.03)
+      const { pos, quaternion } = getPlacementTransform(normal, this.planetRadius, 'rock')
       const matrix = new Matrix4()
       matrix.compose(
         pos,

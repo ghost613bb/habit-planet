@@ -8,7 +8,7 @@ import {
 } from 'three'
 
 import { mats } from '../assets/Materials'
-import { getSurfaceTransform } from '../math/PlanetMath'
+import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
 type VegetationLayerOptions = {
@@ -70,14 +70,18 @@ export class VegetationLayer implements LayerController {
 
     const visibleBushCount = input.stageIndex === 1 ? 0 : 2 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.bushes.length; i += 1) {
-      this.bushes[i].visible = i < visibleBushCount
-      this.bushes[i].scale.setScalar(0.75 + input.stageProgress * 0.25)
+      const bush = this.bushes[i]
+      if (!bush) continue
+      bush.visible = i < visibleBushCount
+      bush.scale.setScalar(0.75 + input.stageProgress * 0.25)
     }
 
     const visibleTreeCount = input.stageIndex === 1 ? 0 : 1 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.trees.length; i += 1) {
-      this.trees[i].visible = i < visibleTreeCount
-      this.trees[i].scale.setScalar(0.7 + input.stageProgress * 0.3)
+      const tree = this.trees[i]
+      if (!tree) continue
+      tree.visible = i < visibleTreeCount
+      tree.scale.setScalar(0.7 + input.stageProgress * 0.3)
     }
   }
 
@@ -106,9 +110,10 @@ export class VegetationLayer implements LayerController {
 
     sprout.add(stem, leafLeft, leafRight)
 
-    const { pos, quaternion } = getSurfaceTransform(new Vector3(0, 1, 0), this.planetRadius + 0.04)
+    const { pos, quaternion } = getPlacementTransform(new Vector3(0, 1, 0), this.planetRadius, 'sprout')
     sprout.position.copy(pos)
     sprout.quaternion.copy(quaternion)
+    sprout.renderOrder = 3
 
     return sprout
   }
@@ -128,9 +133,10 @@ export class VegetationLayer implements LayerController {
       body.position.y = 0.14
       bush.add(body)
 
-      const { pos, quaternion } = getSurfaceTransform(
+      const { pos, quaternion } = getPlacementTransform(
         new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius + 0.02,
+        this.planetRadius,
+        'bush',
       )
       bush.position.copy(pos)
       bush.quaternion.copy(quaternion)
@@ -157,9 +163,10 @@ export class VegetationLayer implements LayerController {
 
       tree.add(trunk, canopy)
 
-      const { pos, quaternion } = getSurfaceTransform(
+      const { pos, quaternion } = getPlacementTransform(
         new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius + 0.02,
+        this.planetRadius,
+        'tree',
       )
       tree.position.copy(pos)
       tree.quaternion.copy(quaternion)
