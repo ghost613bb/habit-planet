@@ -144,8 +144,8 @@ class Stage2 implements Stage {
       '/models/rock/Rock_Medium_3.gltf'
     ];
 
-    // 岩石颜色列表（岩灰色）
-    const rockColors = ['#707070', '#808080', '#909090'];
+    // 岩石颜色列表（统一中性灰）
+    const rockColors = ['#6f6f6f', '#868686', '#929292'];
 
     // 创建更多石头（5个）
     for (let i = 0; i < 5; i++) {
@@ -224,8 +224,8 @@ class Stage2 implements Stage {
         const rock = gltf.scene;
         rock.scale.set(8888, 0.08, 0.08);
 
-        // 为石头设置默认颜色（深灰色）
-        this.setDefaultMaterialColor(rock, '#505050');
+        // 为石头设置默认颜色（比普通岩石更深一档）
+        this.setDefaultMaterialColor(rock, '#5f5f5f');
 
         // 围成一圈
         const angle = (i / 6) * Math.PI * 2;

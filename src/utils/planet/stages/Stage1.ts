@@ -93,8 +93,8 @@ class Stage1 implements Stage {
       '/models/rock/Rock_Medium_3.gltf'
     ];
 
-    // 岩石颜色列表（岩灰色）
-    const rockColors = ['#707070', '#808080', '#909090'];
+    // 岩石颜色列表（统一中性灰）
+    const rockColors = ['#6f6f6f', '#868686', '#929292'];
 
     // 固定的岩石位置（分散分布）
     const rockPositions = [
