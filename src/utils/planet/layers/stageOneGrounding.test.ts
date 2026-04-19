@@ -1,7 +1,7 @@
 import { Group, Mesh, MeshLambertMaterial, SphereGeometry, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
-import { getPlanetGrassOverlayState, resetPlanetGrassOverlay } from '../assets/Materials'
+import { getPlanetGrassOverlayState, mats, resetPlanetGrassOverlay } from '../assets/Materials'
 import {
   getPlacementTransform,
 } from '../math/PlanetMath'
@@ -9,6 +9,10 @@ import { TerrainLayer } from './TerrainLayer'
 import { VegetationLayer } from './VegetationLayer'
 
 describe('阶段 1 贴地与遮挡', () => {
+  it('实例岩石使用统一的中性灰主色', () => {
+    expect(`#${mats.rockInstanced.color.getHexString()}`).toBe('#767676')
+  })
+
   it('统一贴地基准后，草层低于石头，石头低于幼苗', () => {
     const topNormal = new Vector3(0, 1, 0)
 

@@ -156,7 +156,7 @@ export const mats = {
   }),
   blade: new MeshLambertMaterial({ color: 0xffffff }),
   rockInstanced: new MeshLambertMaterial({
-    color: 0x8b7e66,
+    color: 0x767676,
     flatShading: true,
   }),
   grassInstanced: new MeshLambertMaterial({
