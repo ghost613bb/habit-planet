@@ -108,7 +108,7 @@ export class VegetationLayer implements LayerController {
     }
 
     const visibleGrassPatchCount =
-      stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 3 : 6
+      stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 6 : 12
 
     if (visibleGrassPatchCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇首次需要显示时懒加载一次。
@@ -234,13 +234,18 @@ export class VegetationLayer implements LayerController {
 
   private createGrassPatchAnchors() {
     const anchors = [
-      { phi: 0.07, theta: 0.15, scale: 0.2 },
-      { phi: 0.09, theta: 0.95, scale: 0.18 },
-      { phi: 0.11, theta: 1.85, scale: 0.22 },
-      { phi: 0.16, theta: 0.5, scale: 0.19 },
-      { phi: 0.18, theta: 1.45, scale: 0.24 },
-      { phi: 0.2, theta: 2.35, scale: 0.21 },
-      { phi: 0.13, theta: 5.55, scale: 0.17 },
+      { phi: 0.07, theta: 0.15, scale: 0.28 },
+      { phi: 0.09, theta: 0.95, scale: 0.26 },
+      { phi: 0.11, theta: 1.85, scale: 0.3 },
+      { phi: 0.16, theta: 0.5, scale: 0.27 },
+      { phi: 0.18, theta: 1.45, scale: 0.32 },
+      { phi: 0.2, theta: 2.35, scale: 0.29 },
+      { phi: 0.13, theta: 5.55, scale: 0.25 },
+      { phi: 0.1, theta: 2.8, scale: 0.27 },
+      { phi: 0.14, theta: 3.45, scale: 0.29 },
+      { phi: 0.17, theta: 4.2, scale: 0.31 },
+      { phi: 0.12, theta: 4.95, scale: 0.28 },
+      { phi: 0.19, theta: 5.75, scale: 0.3 },
     ]
 
     return anchors.map((anchor, index) => {
