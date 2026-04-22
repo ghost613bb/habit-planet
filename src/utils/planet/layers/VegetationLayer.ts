@@ -31,10 +31,10 @@ export class VegetationLayer implements LayerController {
   private grassPatchTemplate: Group | null = null
   private grassPatchLoader = new GLTFLoader(new LoadingManager())
   private grassPatchLoadPromise: Promise<void> | null = null
-  private meadowPatches: Group[] = []
-  private meadowPatchTemplate: Group | null = null
-  private meadowPatchLoader = new GLTFLoader(new LoadingManager())
-  private meadowPatchLoadPromise: Promise<void> | null = null
+  private lowpolyGrassPatches: Group[] = []
+  private lowpolyGrassTemplate: Group | null = null
+  private lowpolyGrassLoader = new GLTFLoader(new LoadingManager())
+  private lowpolyGrassLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -55,8 +55,8 @@ export class VegetationLayer implements LayerController {
     this.grassPatches = this.createGrassPatchAnchors()
     this.grassPatches.forEach((item) => this.group.add(item))
 
-    this.meadowPatches = this.createMeadowPatchAnchors()
-    this.meadowPatches.forEach((item) => this.group.add(item))
+    this.lowpolyGrassPatches = this.createLowpolyGrassAnchors()
+    this.lowpolyGrassPatches.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
@@ -69,12 +69,12 @@ export class VegetationLayer implements LayerController {
         this.attachGrassPatchInstances()
         this.grassPatchLoadPromise = Promise.resolve()
       }
-      if (!this.meadowPatchLoadPromise) {
-        this.meadowPatchTemplate = new Group()
-        this.attachMeadowPatchInstances()
-        this.meadowPatchLoadPromise = Promise.resolve()
+      if (!this.lowpolyGrassLoadPromise) {
+        this.lowpolyGrassTemplate = new Group()
+        this.attachLowpolyGrassInstances()
+        this.lowpolyGrassLoadPromise = Promise.resolve()
       }
-      return Promise.all([this.grassPatchLoadPromise, this.meadowPatchLoadPromise]).then(() => undefined)
+      return Promise.all([this.grassPatchLoadPromise, this.lowpolyGrassLoadPromise]).then(() => undefined)
     }
 
     if (!this.grassPatchLoadPromise) {
@@ -97,18 +97,18 @@ export class VegetationLayer implements LayerController {
       })
     }
 
-    if (!this.meadowPatchLoadPromise) {
-      const meadowPatchUrl =
+    if (!this.lowpolyGrassLoadPromise) {
+      const lowpolyGrassUrl =
         typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
-          ? new URL('/models/patch_of_grass/scene.gltf', globalThis.location.origin).toString()
-          : '/models/patch_of_grass/scene.gltf'
+          ? new URL('/models/lowpoly_grass/scene.gltf', globalThis.location.origin).toString()
+          : '/models/lowpoly_grass/scene.gltf'
 
-      this.meadowPatchLoadPromise = new Promise((resolve, reject) => {
-        this.meadowPatchLoader.load(
-          meadowPatchUrl,
+      this.lowpolyGrassLoadPromise = new Promise((resolve, reject) => {
+        this.lowpolyGrassLoader.load(
+          lowpolyGrassUrl,
           (gltf) => {
-            this.meadowPatchTemplate = gltf.scene.clone(true)
-            this.attachMeadowPatchInstances()
+            this.lowpolyGrassTemplate = gltf.scene.clone(true)
+            this.attachLowpolyGrassInstances()
             resolve()
           },
           undefined,
@@ -117,7 +117,7 @@ export class VegetationLayer implements LayerController {
       })
     }
 
-    return Promise.all([this.grassPatchLoadPromise, this.meadowPatchLoadPromise]).then(() => undefined)
+    return Promise.all([this.grassPatchLoadPromise, this.lowpolyGrassLoadPromise]).then(() => undefined)
   }
 
   activate(input: LayerUpdateInput) {
@@ -144,6 +144,7 @@ export class VegetationLayer implements LayerController {
 
     const visibleGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
+    const stageOneGrassPatchCount = stageTwoDay == null ? visibleGrassPatchCount : 0
 
     if (visibleGrassPatchCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇首次需要显示时懒加载一次。
@@ -153,20 +154,20 @@ export class VegetationLayer implements LayerController {
     for (let i = 0; i < this.grassPatches.length; i += 1) {
       const patch = this.grassPatches[i]
       if (!patch) continue
-      patch.visible = i < visibleGrassPatchCount
+      patch.visible = i < stageOneGrassPatchCount
     }
 
-    const visibleMeadowPatchCount = stageTwoDay == null ? 0 : stageTwoDay === 4 ? 2 : 4
+    const visibleLowpolyGrassCount = stageTwoDay == null ? 0 : stageTwoDay === 4 ? 2 : 4
 
-    if (visibleMeadowPatchCount > 0) {
-      // 第二阶段第 4-5 天用面积更大的草丛块替代第一阶段的小草簇表现。
+    if (visibleLowpolyGrassCount > 0) {
+      // 第二阶段第 4-5 天改用更立体的 lowpoly_grass 草丛层。
       void this.preload()
     }
 
-    for (let i = 0; i < this.meadowPatches.length; i += 1) {
-      const patch = this.meadowPatches[i]
+    for (let i = 0; i < this.lowpolyGrassPatches.length; i += 1) {
+      const patch = this.lowpolyGrassPatches[i]
       if (!patch) continue
-      patch.visible = i < visibleMeadowPatchCount
+      patch.visible = i < visibleLowpolyGrassCount
     }
 
     const visibleBushCount =
@@ -199,7 +200,7 @@ export class VegetationLayer implements LayerController {
     this.grassPatches.forEach((patch) => {
       patch.visible = false
     })
-    this.meadowPatches.forEach((patch) => {
+    this.lowpolyGrassPatches.forEach((patch) => {
       patch.visible = false
     })
   }
@@ -339,12 +340,12 @@ export class VegetationLayer implements LayerController {
     })
   }
 
-  private createMeadowPatchAnchors() {
+  private createLowpolyGrassAnchors() {
     const anchors = [
-      { phi: 0.2, theta: 0.7, scale: 0.035 },
-      { phi: 0.22, theta: 1.95, scale: 0.032 },
-      { phi: 0.18, theta: 3.35, scale: 0.034 },
-      { phi: 0.24, theta: 4.7, scale: 0.033 },
+      { phi: 0.18, theta: 0.82, scale: 0.12 },
+      { phi: 0.21, theta: 2.18, scale: 0.11 },
+      { phi: 0.19, theta: 3.72, scale: 0.115 },
+      { phi: 0.22, theta: 5.02, scale: 0.11 },
     ]
 
     return anchors.map((anchor, index) => {
@@ -364,13 +365,13 @@ export class VegetationLayer implements LayerController {
     })
   }
 
-  private attachMeadowPatchInstances() {
-    this.meadowPatches.forEach((patch, index) => {
+  private attachLowpolyGrassInstances() {
+    this.lowpolyGrassPatches.forEach((patch, index) => {
       patch.clear()
-      if (!this.meadowPatchTemplate) return
+      if (!this.lowpolyGrassTemplate) return
 
-      const instance = this.meadowPatchTemplate.clone(true)
-      instance.rotation.y = index * 0.7
+      const instance = this.lowpolyGrassTemplate.clone(true)
+      instance.rotation.y = index * 0.8
       patch.add(instance)
     })
   }

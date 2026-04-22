@@ -22,14 +22,14 @@ describe('阶段 2 早期植被', () => {
 
     const bushes = (vegetationLayer as any).bushes as Object3D[]
     const trees = (vegetationLayer as any).trees as Object3D[]
-    const meadowPatches = (vegetationLayer as any).meadowPatches as Object3D[]
+    const lowpolyGrassPatches = (vegetationLayer as any).lowpolyGrassPatches as Object3D[]
     const visibleBushCount = bushes.filter((item) => item.visible).length
     const visibleTreeCount = trees.filter((item) => item.visible).length
-    const visibleMeadowCount = meadowPatches.filter((item) => item.visible).length
+    const visibleLowpolyGrassCount = lowpolyGrassPatches.filter((item) => item.visible).length
 
     expect(visibleBushCount).toBe(2)
     expect(visibleTreeCount).toBe(0)
-    expect(visibleMeadowCount).toBe(2)
+    expect(visibleLowpolyGrassCount).toBe(2)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -88,19 +88,19 @@ describe('阶段 2 早期植被', () => {
       ((vegetationLayer as any).bushes as Object3D[]).filter((item) => item.visible).length
     const getVisibleTreeCount = () =>
       ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
-    const getVisibleMeadowCount = () =>
-      ((vegetationLayer as any).meadowPatches as Object3D[]).filter((item) => item.visible).length
+    const getVisibleLowpolyGrassCount = () =>
+      ((vegetationLayer as any).lowpolyGrassPatches as Object3D[]).filter((item) => item.visible).length
 
     vegetationLayer.update(dayFourInput)
     await vegetationLayer.preload()
     const dayFourBushCount = getVisibleBushCount()
     const dayFourTreeCount = getVisibleTreeCount()
-    const dayFourMeadowCount = getVisibleMeadowCount()
+    const dayFourLowpolyGrassCount = getVisibleLowpolyGrassCount()
 
     vegetationLayer.update(dayFiveInput)
 
     expect(getVisibleBushCount()).toBeGreaterThan(dayFourBushCount)
     expect(getVisibleTreeCount()).toBeGreaterThan(dayFourTreeCount)
-    expect(getVisibleMeadowCount()).toBeGreaterThan(dayFourMeadowCount)
+    expect(getVisibleLowpolyGrassCount()).toBeGreaterThan(dayFourLowpolyGrassCount)
   })
 })
