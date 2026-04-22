@@ -58,6 +58,7 @@ export class TerrainLayer implements LayerController {
   update(input: LayerUpdateInput) {
     const grassMaterial = this.grassMesh.material as MeshLambertMaterial
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
+    const stageTwoDay = input.stageIndex === 2 ? Math.max(4, Math.floor(input.dayCount)) : null
     const scaleByStage = {
       1: 0.2 + input.stageProgress * 0.25,
       2: 0.48 + input.stageProgress * 0.18,
@@ -98,6 +99,11 @@ export class TerrainLayer implements LayerController {
     )
 
     this.rocks.visible = input.stageIndex <= 2
+    if (stageTwoDay != null) {
+      this.rocks.count = stageTwoDay === 4 ? 5 : stageTwoDay === 5 ? 6 : 8
+      return
+    }
+
     this.rocks.count = input.stageIndex === 2 ? 8 : 0
   }
 

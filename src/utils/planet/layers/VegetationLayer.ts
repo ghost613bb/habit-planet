@@ -31,6 +31,10 @@ export class VegetationLayer implements LayerController {
   private grassPatchTemplate: Group | null = null
   private grassPatchLoader = new GLTFLoader(new LoadingManager())
   private grassPatchLoadPromise: Promise<void> | null = null
+  private meadowPatches: Group[] = []
+  private meadowPatchTemplate: Group | null = null
+  private meadowPatchLoader = new GLTFLoader(new LoadingManager())
+  private meadowPatchLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -50,40 +54,70 @@ export class VegetationLayer implements LayerController {
 
     this.grassPatches = this.createGrassPatchAnchors()
     this.grassPatches.forEach((item) => this.group.add(item))
+
+    this.meadowPatches = this.createMeadowPatchAnchors()
+    this.meadowPatches.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
-    if (this.grassPatchLoadPromise) return this.grassPatchLoadPromise
-
     const isJsdomEnvironment =
       typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
 
     if (isJsdomEnvironment) {
-      this.grassPatchTemplate = new Group()
-      this.attachGrassPatchInstances()
-      this.grassPatchLoadPromise = Promise.resolve()
-      return this.grassPatchLoadPromise
+      if (!this.grassPatchLoadPromise) {
+        this.grassPatchTemplate = new Group()
+        this.attachGrassPatchInstances()
+        this.grassPatchLoadPromise = Promise.resolve()
+      }
+      if (!this.meadowPatchLoadPromise) {
+        this.meadowPatchTemplate = new Group()
+        this.attachMeadowPatchInstances()
+        this.meadowPatchLoadPromise = Promise.resolve()
+      }
+      return Promise.all([this.grassPatchLoadPromise, this.meadowPatchLoadPromise]).then(() => undefined)
     }
 
-    const grassPatchUrl =
-      typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
-        ? new URL('/models/grass_patches/scene.gltf', globalThis.location.origin).toString()
-        : '/models/grass_patches/scene.gltf'
+    if (!this.grassPatchLoadPromise) {
+      const grassPatchUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/grass_patches/scene.gltf', globalThis.location.origin).toString()
+          : '/models/grass_patches/scene.gltf'
 
-    this.grassPatchLoadPromise = new Promise((resolve, reject) => {
-      this.grassPatchLoader.load(
-        grassPatchUrl,
-        (gltf) => {
-          this.grassPatchTemplate = gltf.scene.clone(true)
-          this.attachGrassPatchInstances()
-          resolve()
-        },
-        undefined,
-        reject,
-      )
-    })
+      this.grassPatchLoadPromise = new Promise((resolve, reject) => {
+        this.grassPatchLoader.load(
+          grassPatchUrl,
+          (gltf) => {
+            this.grassPatchTemplate = gltf.scene.clone(true)
+            this.attachGrassPatchInstances()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
 
-    return this.grassPatchLoadPromise
+    if (!this.meadowPatchLoadPromise) {
+      const meadowPatchUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/patch_of_grass/scene.gltf', globalThis.location.origin).toString()
+          : '/models/patch_of_grass/scene.gltf'
+
+      this.meadowPatchLoadPromise = new Promise((resolve, reject) => {
+        this.meadowPatchLoader.load(
+          meadowPatchUrl,
+          (gltf) => {
+            this.meadowPatchTemplate = gltf.scene.clone(true)
+            this.attachMeadowPatchInstances()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return Promise.all([this.grassPatchLoadPromise, this.meadowPatchLoadPromise]).then(() => undefined)
   }
 
   activate(input: LayerUpdateInput) {
@@ -97,6 +131,7 @@ export class VegetationLayer implements LayerController {
     if (isLegacyStage) return
 
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
+    const stageTwoDay = input.stageIndex === 2 ? Math.max(4, Math.floor(input.dayCount)) : null
 
     this.sprout.visible = true
     if (stageOneDay != null) {
@@ -121,7 +156,27 @@ export class VegetationLayer implements LayerController {
       patch.visible = i < visibleGrassPatchCount
     }
 
-    const visibleBushCount = input.stageIndex === 1 ? 0 : 2 + Math.round(input.stageProgress * 2)
+    const visibleMeadowPatchCount = stageTwoDay == null ? 0 : stageTwoDay === 4 ? 2 : 4
+
+    if (visibleMeadowPatchCount > 0) {
+      // 第二阶段第 4-5 天用面积更大的草丛块替代第一阶段的小草簇表现。
+      void this.preload()
+    }
+
+    for (let i = 0; i < this.meadowPatches.length; i += 1) {
+      const patch = this.meadowPatches[i]
+      if (!patch) continue
+      patch.visible = i < visibleMeadowPatchCount
+    }
+
+    const visibleBushCount =
+      input.stageIndex === 1
+        ? 0
+        : stageTwoDay === 4
+          ? 2
+          : stageTwoDay === 5
+            ? 4
+            : 2 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.bushes.length; i += 1) {
       const bush = this.bushes[i]
       if (!bush) continue
@@ -129,7 +184,8 @@ export class VegetationLayer implements LayerController {
       bush.scale.setScalar(0.75 + input.stageProgress * 0.25)
     }
 
-    const visibleTreeCount = input.stageIndex === 1 ? 0 : 1 + Math.round(input.stageProgress * 2)
+    const visibleTreeCount =
+      input.stageIndex === 1 ? 0 : stageTwoDay === 4 ? 0 : 1 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.trees.length; i += 1) {
       const tree = this.trees[i]
       if (!tree) continue
@@ -141,6 +197,9 @@ export class VegetationLayer implements LayerController {
   deactivate() {
     this.group.visible = false
     this.grassPatches.forEach((patch) => {
+      patch.visible = false
+    })
+    this.meadowPatches.forEach((patch) => {
       patch.visible = false
     })
   }
@@ -276,6 +335,42 @@ export class VegetationLayer implements LayerController {
 
       const instance = this.grassPatchTemplate.clone(true)
       instance.rotation.y = index * 0.9
+      patch.add(instance)
+    })
+  }
+
+  private createMeadowPatchAnchors() {
+    const anchors = [
+      { phi: 0.2, theta: 0.7, scale: 0.035 },
+      { phi: 0.22, theta: 1.95, scale: 0.032 },
+      { phi: 0.18, theta: 3.35, scale: 0.034 },
+      { phi: 0.24, theta: 4.7, scale: 0.033 },
+    ]
+
+    return anchors.map((anchor, index) => {
+      const patch = new Group()
+      const { pos, quaternion } = getPlacementTransform(
+        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+        this.planetRadius,
+        'grassLayer',
+      )
+
+      patch.position.copy(pos)
+      patch.quaternion.copy(quaternion)
+      patch.scale.setScalar(anchor.scale + index * 0.002)
+      patch.visible = false
+
+      return patch
+    })
+  }
+
+  private attachMeadowPatchInstances() {
+    this.meadowPatches.forEach((patch, index) => {
+      patch.clear()
+      if (!this.meadowPatchTemplate) return
+
+      const instance = this.meadowPatchTemplate.clone(true)
+      instance.rotation.y = index * 0.7
       patch.add(instance)
     })
   }
