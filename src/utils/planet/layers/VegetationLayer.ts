@@ -108,7 +108,7 @@ export class VegetationLayer implements LayerController {
     }
 
     const visibleGrassPatchCount =
-      stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 6 : 12
+      stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
 
     if (visibleGrassPatchCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇首次需要显示时懒加载一次。
@@ -246,6 +246,10 @@ export class VegetationLayer implements LayerController {
       { phi: 0.17, theta: 4.2, scale: 0.31 },
       { phi: 0.12, theta: 4.95, scale: 0.28 },
       { phi: 0.19, theta: 5.75, scale: 0.3 },
+      { phi: 0.15, theta: 3.1, scale: 0.28 },
+      { phi: 0.16, theta: 3.8, scale: 0.3 },
+      { phi: 0.14, theta: 4.55, scale: 0.29 },
+      { phi: 0.11, theta: 5.3, scale: 0.27 },
     ]
 
     return anchors.map((anchor, index) => {

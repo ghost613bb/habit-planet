@@ -103,11 +103,11 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(getVisibleGrassCount()).toBe(0)
 
     vegetationLayer.update(dayTwoInput)
-    expect(getVisibleGrassCount()).toBe(6)
+    expect(getVisibleGrassCount()).toBe(8)
 
     vegetationLayer.update(dayThreeInput)
-    expect(getVisibleGrassCount()).toBeGreaterThanOrEqual(11)
-    expect(getVisibleGrassCount()).toBeLessThanOrEqual(12)
+    expect(getVisibleGrassCount()).toBeGreaterThanOrEqual(15)
+    expect(getVisibleGrassCount()).toBeLessThanOrEqual(16)
   })
 
   it('阶段 1 草簇在真实运行链路里只调用 update 也会触发加载', async () => {
