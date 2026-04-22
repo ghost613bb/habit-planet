@@ -5,7 +5,7 @@ import { TerrainLayer } from './TerrainLayer'
 import { VegetationLayer } from './VegetationLayer'
 
 describe('阶段 2 早期植被', () => {
-  it('第 4 天先出现灌木和少量草丛块，树木仍保持隐藏', async () => {
+  it('第 4 天先出现更多灌木和更高密度草簇，树木仍保持隐藏', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -22,14 +22,15 @@ describe('阶段 2 早期植被', () => {
 
     const bushes = (vegetationLayer as any).bushes as Object3D[]
     const trees = (vegetationLayer as any).trees as Object3D[]
-    const lowpolyGrassPatches = (vegetationLayer as any).lowpolyGrassPatches as Object3D[]
+    const grassPatches = (vegetationLayer as any).grassPatches as Object3D[]
     const visibleBushCount = bushes.filter((item) => item.visible).length
     const visibleTreeCount = trees.filter((item) => item.visible).length
-    const visibleLowpolyGrassCount = lowpolyGrassPatches.filter((item) => item.visible).length
+    const visibleGrassPatchCount = grassPatches.filter((item) => item.visible).length
 
-    expect(visibleBushCount).toBe(2)
+    expect(visibleBushCount).toBe(3)
     expect(visibleTreeCount).toBe(0)
-    expect(visibleLowpolyGrassCount).toBe(2)
+    expect(visibleGrassPatchCount).toBeGreaterThanOrEqual(22)
+    expect(visibleGrassPatchCount).toBeLessThanOrEqual(24)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -64,7 +65,7 @@ describe('阶段 2 早期植被', () => {
     expect(rocks.count).toBe(6)
   })
 
-  it('第 5 天比第 4 天出现更多灌木、树木和草丛块', async () => {
+  it('第 5 天比第 4 天出现更多灌木、树木和草簇', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -88,19 +89,21 @@ describe('阶段 2 早期植被', () => {
       ((vegetationLayer as any).bushes as Object3D[]).filter((item) => item.visible).length
     const getVisibleTreeCount = () =>
       ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
-    const getVisibleLowpolyGrassCount = () =>
-      ((vegetationLayer as any).lowpolyGrassPatches as Object3D[]).filter((item) => item.visible).length
+    const getVisibleGrassPatchCount = () =>
+      ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
 
     vegetationLayer.update(dayFourInput)
     await vegetationLayer.preload()
     const dayFourBushCount = getVisibleBushCount()
     const dayFourTreeCount = getVisibleTreeCount()
-    const dayFourLowpolyGrassCount = getVisibleLowpolyGrassCount()
+    const dayFourGrassPatchCount = getVisibleGrassPatchCount()
 
     vegetationLayer.update(dayFiveInput)
 
-    expect(getVisibleBushCount()).toBeGreaterThan(dayFourBushCount)
-    expect(getVisibleTreeCount()).toBeGreaterThan(dayFourTreeCount)
-    expect(getVisibleLowpolyGrassCount()).toBeGreaterThan(dayFourLowpolyGrassCount)
+    expect(getVisibleBushCount()).toBe(5)
+    expect(getVisibleTreeCount()).toBe(1)
+    expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
+    expect(getVisibleGrassPatchCount()).toBeGreaterThanOrEqual(28)
+    expect(getVisibleGrassPatchCount()).toBeLessThanOrEqual(32)
   })
 })

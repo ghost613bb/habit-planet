@@ -142,11 +142,14 @@ export class VegetationLayer implements LayerController {
       this.sprout.scale.setScalar(0.55 + input.stageProgress * 0.45)
     }
 
-    const visibleGrassPatchCount =
+    const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
-    const stageOneGrassPatchCount = stageTwoDay == null ? visibleGrassPatchCount : 0
+    const stageTwoGrassPatchCount =
+      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 24 : stageTwoDay === 5 ? 32 : 0
+    const totalVisibleGrassPatchCount =
+      stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
 
-    if (visibleGrassPatchCount > 0) {
+    if (totalVisibleGrassPatchCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇首次需要显示时懒加载一次。
       void this.preload()
     }
@@ -154,10 +157,10 @@ export class VegetationLayer implements LayerController {
     for (let i = 0; i < this.grassPatches.length; i += 1) {
       const patch = this.grassPatches[i]
       if (!patch) continue
-      patch.visible = i < stageOneGrassPatchCount
+      patch.visible = i < totalVisibleGrassPatchCount
     }
 
-    const visibleLowpolyGrassCount = stageTwoDay == null ? 0 : stageTwoDay === 4 ? 2 : 4
+    const visibleLowpolyGrassCount = 0
 
     if (visibleLowpolyGrassCount > 0) {
       // 第二阶段第 4-5 天改用更立体的 lowpoly_grass 草丛层。
@@ -174,9 +177,9 @@ export class VegetationLayer implements LayerController {
       input.stageIndex === 1
         ? 0
         : stageTwoDay === 4
-          ? 2
+          ? 3
           : stageTwoDay === 5
-            ? 4
+            ? 5
             : 2 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.bushes.length; i += 1) {
       const bush = this.bushes[i]
@@ -240,6 +243,7 @@ export class VegetationLayer implements LayerController {
       { phi: 0.18, theta: 1.6 },
       { phi: 0.24, theta: 2.4 },
       { phi: 0.16, theta: 5.1 },
+      { phi: 0.14, theta: 3.6 },
     ]
 
     return anchors.map((anchor) => {
@@ -310,6 +314,22 @@ export class VegetationLayer implements LayerController {
       { phi: 0.16, theta: 3.8, scale: 0.3 },
       { phi: 0.14, theta: 4.55, scale: 0.29 },
       { phi: 0.11, theta: 5.3, scale: 0.27 },
+      { phi: 0.08, theta: 0.5, scale: 0.27 },
+      { phi: 0.1, theta: 1.2, scale: 0.28 },
+      { phi: 0.12, theta: 1.6, scale: 0.29 },
+      { phi: 0.15, theta: 2.05, scale: 0.28 },
+      { phi: 0.17, theta: 2.55, scale: 0.3 },
+      { phi: 0.18, theta: 2.95, scale: 0.29 },
+      { phi: 0.16, theta: 3.35, scale: 0.31 },
+      { phi: 0.13, theta: 3.95, scale: 0.28 },
+      { phi: 0.12, theta: 4.35, scale: 0.29 },
+      { phi: 0.1, theta: 4.75, scale: 0.27 },
+      { phi: 0.14, theta: 5.15, scale: 0.3 },
+      { phi: 0.17, theta: 5.55, scale: 0.31 },
+      { phi: 0.2, theta: 5.95, scale: 0.3 },
+      { phi: 0.19, theta: 0.25, scale: 0.29 },
+      { phi: 0.16, theta: 0.85, scale: 0.28 },
+      { phi: 0.13, theta: 2.7, scale: 0.29 },
     ]
 
     return anchors.map((anchor, index) => {
@@ -342,10 +362,10 @@ export class VegetationLayer implements LayerController {
 
   private createLowpolyGrassAnchors() {
     const anchors = [
-      { phi: 0.18, theta: 0.82, scale: 0.12 },
-      { phi: 0.21, theta: 2.18, scale: 0.11 },
-      { phi: 0.19, theta: 3.72, scale: 0.115 },
-      { phi: 0.22, theta: 5.02, scale: 0.11 },
+      { phi: 0.18, theta: 0.82, scale: 0.22 },
+      { phi: 0.21, theta: 2.18, scale: 0.2 },
+      { phi: 0.19, theta: 3.72, scale: 0.21 },
+      { phi: 0.22, theta: 5.02, scale: 0.2 },
     ]
 
     return anchors.map((anchor, index) => {
@@ -371,6 +391,8 @@ export class VegetationLayer implements LayerController {
       if (!this.lowpolyGrassTemplate) return
 
       const instance = this.lowpolyGrassTemplate.clone(true)
+      // 该资源导出时以 Z 轴为“向上”，需要转成 Three.js 场景中的 Y 轴向上。
+      instance.rotation.x = Math.PI / 2
       instance.rotation.y = index * 0.8
       patch.add(instance)
     })
