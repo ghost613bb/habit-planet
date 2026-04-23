@@ -18,6 +18,23 @@ type TerrainLayerOptions = {
   planetRadius: number
 }
 
+const STAGE_ONE_DAY_THREE_OVERLAY = {
+  strength: 0.9,
+  radius: 1.02,
+  feather: 0.28,
+  topStart: 0.7,
+  topEnd: 0.9,
+  irregularity: 0.1,
+  color: '#7b9452',
+} as const
+
+const STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY = {
+  ...STAGE_ONE_DAY_THREE_OVERLAY,
+  radius: 1.28,
+  feather: 0.4,
+  topStart: 0.58,
+} as const
+
 export class TerrainLayer implements LayerController {
   id = 'terrain'
 
@@ -73,15 +90,7 @@ export class TerrainLayer implements LayerController {
       // 第 1 天只出现幼苗；第 3 天才让顶部轻微泛绿，模拟草被刚长出来。
       this.grassMesh.visible = false
       if (stageOneDay >= 3) {
-        setPlanetGrassOverlay({
-          strength: 0.9,
-          radius: 1.02,
-          feather: 0.28,
-          topStart: 0.7,
-          topEnd: 0.9,
-          irregularity: 0.1,
-          color: '#7b9452',
-        })
+        setPlanetGrassOverlay(STAGE_ONE_DAY_THREE_OVERLAY)
       } else {
         resetPlanetGrassOverlay()
       }
@@ -91,7 +100,12 @@ export class TerrainLayer implements LayerController {
       return
     }
 
-    resetPlanetGrassOverlay()
+    if (stageTwoDay != null && stageTwoDay <= 5) {
+      // 第二阶段第 4-5 天保留第一阶段的泛绿基调，但范围中幅扩大，让草地更开阔。
+      setPlanetGrassOverlay(STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY)
+    } else {
+      resetPlanetGrassOverlay()
+    }
     this.grassMesh.visible = input.stageIndex >= 1
     this.grassMesh.scale.set(nextScale, nextScale, nextScale)
     grassMaterial.color.set(

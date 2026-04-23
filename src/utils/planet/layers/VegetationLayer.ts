@@ -145,7 +145,7 @@ export class VegetationLayer implements LayerController {
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
     const stageTwoGrassPatchCount =
-      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 24 : stageTwoDay === 5 ? 32 : 0
+      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 45 : 0
     const totalVisibleGrassPatchCount =
       stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
 
@@ -297,40 +297,23 @@ export class VegetationLayer implements LayerController {
   }
 
   private createGrassPatchAnchors() {
-    const anchors = [
-      { phi: 0.07, theta: 0.15, scale: 0.28 },
-      { phi: 0.09, theta: 0.95, scale: 0.26 },
-      { phi: 0.11, theta: 1.85, scale: 0.3 },
-      { phi: 0.16, theta: 0.5, scale: 0.27 },
-      { phi: 0.18, theta: 1.45, scale: 0.32 },
-      { phi: 0.2, theta: 2.35, scale: 0.29 },
-      { phi: 0.13, theta: 5.55, scale: 0.25 },
-      { phi: 0.1, theta: 2.8, scale: 0.27 },
-      { phi: 0.14, theta: 3.45, scale: 0.29 },
-      { phi: 0.17, theta: 4.2, scale: 0.31 },
-      { phi: 0.12, theta: 4.95, scale: 0.28 },
-      { phi: 0.19, theta: 5.75, scale: 0.3 },
-      { phi: 0.15, theta: 3.1, scale: 0.28 },
-      { phi: 0.16, theta: 3.8, scale: 0.3 },
-      { phi: 0.14, theta: 4.55, scale: 0.29 },
-      { phi: 0.11, theta: 5.3, scale: 0.27 },
-      { phi: 0.08, theta: 0.5, scale: 0.27 },
-      { phi: 0.1, theta: 1.2, scale: 0.28 },
-      { phi: 0.12, theta: 1.6, scale: 0.29 },
-      { phi: 0.15, theta: 2.05, scale: 0.28 },
-      { phi: 0.17, theta: 2.55, scale: 0.3 },
-      { phi: 0.18, theta: 2.95, scale: 0.29 },
-      { phi: 0.16, theta: 3.35, scale: 0.31 },
-      { phi: 0.13, theta: 3.95, scale: 0.28 },
-      { phi: 0.12, theta: 4.35, scale: 0.29 },
-      { phi: 0.1, theta: 4.75, scale: 0.27 },
-      { phi: 0.14, theta: 5.15, scale: 0.3 },
-      { phi: 0.17, theta: 5.55, scale: 0.31 },
-      { phi: 0.2, theta: 5.95, scale: 0.3 },
-      { phi: 0.19, theta: 0.25, scale: 0.29 },
-      { phi: 0.16, theta: 0.85, scale: 0.28 },
-      { phi: 0.13, theta: 2.7, scale: 0.29 },
+    // 前 16 个锚点保持更靠近顶部，兼容第一阶段；后续锚点只做小幅外扩与打散，让第二阶段更自然。
+    const ringConfigs = [
+      { count: 8, phiBase: 0.08, phiJitter: 0.015, thetaOffset: 0.1, thetaJitter: 0, scaleBase: 0.27 },
+      { count: 8, phiBase: 0.14, phiJitter: 0.02, thetaOffset: 0.35, thetaJitter: 0, scaleBase: 0.285 },
+      { count: 12, phiBase: 0.238, phiJitter: 0.032, thetaOffset: 0.12, thetaJitter: 0.15, scaleBase: 0.3 },
+      { count: 17, phiBase: 0.34, phiJitter: 0.036, thetaOffset: 0.3, thetaJitter: 0.17, scaleBase: 0.315 },
     ]
+    const anchors = ringConfigs.flatMap((ring) =>
+      Array.from({ length: ring.count }, (_, index) => ({
+        phi: ring.phiBase + (index % 2 === 0 ? ring.phiJitter : -ring.phiJitter),
+        theta:
+          ring.thetaOffset +
+          (index / ring.count) * Math.PI * 2 +
+          (index % 3 === 0 ? ring.thetaJitter : index % 3 === 1 ? -ring.thetaJitter * 0.6 : ring.thetaJitter * 0.35),
+        scale: ring.scaleBase + (index % 3) * 0.012,
+      })),
+    )
 
     return anchors.map((anchor, index) => {
       const patch = new Group()

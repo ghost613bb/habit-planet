@@ -1,10 +1,72 @@
 import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry } from 'three'
 import { describe, expect, it } from 'vitest'
 
+import { getPlanetGrassOverlayState, resetPlanetGrassOverlay } from '../assets/Materials'
 import { TerrainLayer } from './TerrainLayer'
 import { VegetationLayer } from './VegetationLayer'
 
 describe('阶段 2 早期植被', () => {
+  it('第 4-5 天使用比第一阶段更大的顶部泛绿范围，但保留同一套泛绿基调', () => {
+    resetPlanetGrassOverlay()
+    const parentGroup = new Group()
+    const grassMesh = new Mesh(
+      new SphereGeometry(3.05, 16, 16),
+      new MeshLambertMaterial({ color: '#6b7045' }),
+    )
+    const terrainLayer = new TerrainLayer({
+      parentGroup,
+      grassMesh,
+      planetRadius: 3,
+    })
+
+    terrainLayer.update({
+      dayCount: 3,
+      stageIndex: 1 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const stageOneDayThreeOverlay = getPlanetGrassOverlayState()
+
+    terrainLayer.update({
+      dayCount: 4,
+      stageIndex: 2 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+    const stageTwoDayFourOverlay = getPlanetGrassOverlayState()
+
+    terrainLayer.update({
+      dayCount: 5,
+      stageIndex: 2 as const,
+      stageProgress: 0.2,
+      qualityTier: 'tier-1' as const,
+    })
+    const stageTwoDayFiveOverlay = getPlanetGrassOverlayState()
+
+    expect(stageOneDayThreeOverlay).toEqual({
+      strength: 0.9,
+      radius: 1.02,
+      feather: 0.28,
+      topStart: 0.7,
+      topEnd: 0.9,
+      irregularity: 0.1,
+      color: '#7b9452',
+    })
+    expect(stageTwoDayFourOverlay).toEqual({
+      strength: 0.9,
+      radius: 1.28,
+      feather: 0.4,
+      topStart: 0.58,
+      topEnd: 0.9,
+      irregularity: 0.1,
+      color: '#7b9452',
+    })
+    expect(stageTwoDayFiveOverlay).toEqual(stageTwoDayFourOverlay)
+    expect(stageTwoDayFourOverlay.radius).toBeGreaterThan(stageOneDayThreeOverlay.radius)
+    expect(stageTwoDayFourOverlay.topStart).toBeLessThan(stageOneDayThreeOverlay.topStart)
+    expect(grassMesh.visible).toBe(true)
+  })
+
   it('第 4 天先出现更多灌木和更高密度草簇，树木仍保持隐藏', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
@@ -29,8 +91,7 @@ describe('阶段 2 早期植被', () => {
 
     expect(visibleBushCount).toBe(3)
     expect(visibleTreeCount).toBe(0)
-    expect(visibleGrassPatchCount).toBeGreaterThanOrEqual(22)
-    expect(visibleGrassPatchCount).toBeLessThanOrEqual(24)
+    expect(visibleGrassPatchCount).toBe(32)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -65,7 +126,7 @@ describe('阶段 2 早期植被', () => {
     expect(rocks.count).toBe(6)
   })
 
-  it('第 5 天比第 4 天出现更多灌木、树木和草簇', async () => {
+  it('第 4-5 天的草簇都比第一阶段第 3 天铺得更开，且第 5 天继续增密', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -91,19 +152,31 @@ describe('阶段 2 早期植被', () => {
       ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
     const getVisibleGrassPatchCount = () =>
       ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
+    const getVisibleGrassPatchMinNormalizedY = () =>
+      ((vegetationLayer as any).grassPatches as Object3D[])
+        .filter((item) => item.visible)
+        .reduce((minValue, item) => Math.min(minValue, item.position.clone().normalize().y), 1)
+
+    vegetationLayer.update({
+      dayCount: 3,
+      stageIndex: 1 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    await vegetationLayer.preload()
+    const stageOneDayThreeGrassPatchMinNormalizedY = getVisibleGrassPatchMinNormalizedY()
 
     vegetationLayer.update(dayFourInput)
-    await vegetationLayer.preload()
-    const dayFourBushCount = getVisibleBushCount()
-    const dayFourTreeCount = getVisibleTreeCount()
     const dayFourGrassPatchCount = getVisibleGrassPatchCount()
+    const dayFourGrassPatchMinNormalizedY = getVisibleGrassPatchMinNormalizedY()
 
     vegetationLayer.update(dayFiveInput)
 
     expect(getVisibleBushCount()).toBe(5)
     expect(getVisibleTreeCount()).toBe(1)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
-    expect(getVisibleGrassPatchCount()).toBeGreaterThanOrEqual(28)
-    expect(getVisibleGrassPatchCount()).toBeLessThanOrEqual(32)
+    expect(getVisibleGrassPatchCount()).toBe(45)
+    expect(dayFourGrassPatchMinNormalizedY).toBeLessThan(stageOneDayThreeGrassPatchMinNormalizedY)
+    expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
   })
 })
