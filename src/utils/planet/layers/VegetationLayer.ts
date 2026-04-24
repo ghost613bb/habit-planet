@@ -31,10 +31,6 @@ export class VegetationLayer implements LayerController {
   private grassPatchTemplate: Group | null = null
   private grassPatchLoader = new GLTFLoader(new LoadingManager())
   private grassPatchLoadPromise: Promise<void> | null = null
-  private lowpolyGrassPatches: Group[] = []
-  private lowpolyGrassTemplate: Group | null = null
-  private lowpolyGrassLoader = new GLTFLoader(new LoadingManager())
-  private lowpolyGrassLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -54,9 +50,6 @@ export class VegetationLayer implements LayerController {
 
     this.grassPatches = this.createGrassPatchAnchors()
     this.grassPatches.forEach((item) => this.group.add(item))
-
-    this.lowpolyGrassPatches = this.createLowpolyGrassAnchors()
-    this.lowpolyGrassPatches.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
@@ -69,12 +62,7 @@ export class VegetationLayer implements LayerController {
         this.attachGrassPatchInstances()
         this.grassPatchLoadPromise = Promise.resolve()
       }
-      if (!this.lowpolyGrassLoadPromise) {
-        this.lowpolyGrassTemplate = new Group()
-        this.attachLowpolyGrassInstances()
-        this.lowpolyGrassLoadPromise = Promise.resolve()
-      }
-      return Promise.all([this.grassPatchLoadPromise, this.lowpolyGrassLoadPromise]).then(() => undefined)
+      return this.grassPatchLoadPromise
     }
 
     if (!this.grassPatchLoadPromise) {
@@ -97,27 +85,7 @@ export class VegetationLayer implements LayerController {
       })
     }
 
-    if (!this.lowpolyGrassLoadPromise) {
-      const lowpolyGrassUrl =
-        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
-          ? new URL('/models/lowpoly_grass/scene.gltf', globalThis.location.origin).toString()
-          : '/models/lowpoly_grass/scene.gltf'
-
-      this.lowpolyGrassLoadPromise = new Promise((resolve, reject) => {
-        this.lowpolyGrassLoader.load(
-          lowpolyGrassUrl,
-          (gltf) => {
-            this.lowpolyGrassTemplate = gltf.scene.clone(true)
-            this.attachLowpolyGrassInstances()
-            resolve()
-          },
-          undefined,
-          reject,
-        )
-      })
-    }
-
-    return Promise.all([this.grassPatchLoadPromise, this.lowpolyGrassLoadPromise]).then(() => undefined)
+    return this.grassPatchLoadPromise
   }
 
   activate(input: LayerUpdateInput) {
@@ -165,19 +133,6 @@ export class VegetationLayer implements LayerController {
       }
     }
 
-    const visibleLowpolyGrassCount = 0
-
-    if (visibleLowpolyGrassCount > 0) {
-      // 第二阶段第 4-5 天改用更立体的 lowpoly_grass 草丛层。
-      void this.preload()
-    }
-
-    for (let i = 0; i < this.lowpolyGrassPatches.length; i += 1) {
-      const patch = this.lowpolyGrassPatches[i]
-      if (!patch) continue
-      patch.visible = i < visibleLowpolyGrassCount
-    }
-
     const visibleBushCount =
       input.stageIndex === 1
         ? 0
@@ -206,9 +161,6 @@ export class VegetationLayer implements LayerController {
   deactivate() {
     this.group.visible = false
     this.grassPatches.forEach((patch) => {
-      patch.visible = false
-    })
-    this.lowpolyGrassPatches.forEach((patch) => {
       patch.visible = false
     })
   }
@@ -344,44 +296,6 @@ export class VegetationLayer implements LayerController {
 
       const instance = this.grassPatchTemplate.clone(true)
       instance.rotation.y = index * 0.9
-      patch.add(instance)
-    })
-  }
-
-  private createLowpolyGrassAnchors() {
-    const anchors = [
-      { phi: 0.18, theta: 0.82, scale: 0.22 },
-      { phi: 0.21, theta: 2.18, scale: 0.2 },
-      { phi: 0.19, theta: 3.72, scale: 0.21 },
-      { phi: 0.22, theta: 5.02, scale: 0.2 },
-    ]
-
-    return anchors.map((anchor, index) => {
-      const patch = new Group()
-      const { pos, quaternion } = getPlacementTransform(
-        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius,
-        'grassLayer',
-      )
-
-      patch.position.copy(pos)
-      patch.quaternion.copy(quaternion)
-      patch.scale.setScalar(anchor.scale + index * 0.002)
-      patch.visible = false
-
-      return patch
-    })
-  }
-
-  private attachLowpolyGrassInstances() {
-    this.lowpolyGrassPatches.forEach((patch, index) => {
-      patch.clear()
-      if (!this.lowpolyGrassTemplate) return
-
-      const instance = this.lowpolyGrassTemplate.clone(true)
-      // 该资源导出时以 Z 轴为“向上”，需要转成 Three.js 场景中的 Y 轴向上。
-      instance.rotation.x = Math.PI / 2
-      instance.rotation.y = index * 0.8
       patch.add(instance)
     })
   }
