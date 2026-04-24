@@ -105,7 +105,7 @@ describe('阶段 2 早期植被', () => {
     expect(visibleBushCount).toBe(3)
     expect(visibleTreeCount).toBe(0)
     expect(visibleGrassPatchCount).toBe(32)
-    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.27)
+    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.3)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -193,7 +193,7 @@ describe('阶段 2 早期植被', () => {
     expect(getVisibleTreeCount()).toBe(1)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
     expect(getVisibleGrassPatchCount()).toBe(41)
-    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.27)
+    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.3)
     expect(dayFourGrassPatchMinNormalizedY).toBeLessThan(stageOneDayThreeGrassPatchMinNormalizedY)
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
   })

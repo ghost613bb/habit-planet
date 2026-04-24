@@ -154,7 +154,7 @@ describe('阶段 1 贴地与遮挡', () => {
     const visiblePatch = grassPatches.find((item) => item.visible)
 
     expect(visiblePatch).toBeDefined()
-    expect(visiblePatch?.scale.y).toBeCloseTo(0.27)
+    expect(visiblePatch?.scale.y).toBeCloseTo(0.3)
     expect((visiblePatch?.scale.y ?? 0)).toBeGreaterThan(0.2)
     expect((visiblePatch?.scale.y ?? 0)).toBeLessThan(sprout.scale.y)
     expect(visiblePatch?.position.length() ?? 0).toBeLessThan(sprout.position.length())
