@@ -55,21 +55,16 @@ export class FinaleLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
-    const isFinalStage = input.stageIndex === 6
-    this.group.visible = isFinalStage
+    const shouldFallbackToStageFiveVisual = input.stageIndex >= 6
 
-    if (!isFinalStage) return
+    // 第 6 天及以后先沿用第 5 天画面，这里临时关闭终幕层显示。
+    this.group.visible = false
+    this.lifeTree.visible = false
+    this.haloInner.visible = false
+    this.haloOuter.visible = false
+    this.stardust.visible = false
 
-    this.lifeTree.visible = true
-    this.lifeTree.scale.setScalar(0.92 + input.stageProgress * 0.18)
-
-    this.haloInner.visible = true
-    this.haloOuter.visible = true
-    this.haloInner.material.opacity = input.qualityTier === 'tier-0' ? 0.16 : 0.26
-    this.haloOuter.material.opacity = input.qualityTier === 'tier-0' ? 0.1 : 0.22
-
-    this.stardust.visible = input.qualityTier !== 'tier-0'
-    this.stardust.material.opacity = input.qualityTier === 'tier-2' ? 0.72 : 0.48
+    if (!shouldFallbackToStageFiveVisual) return
   }
 
   tick(elapsedMs: number) {
