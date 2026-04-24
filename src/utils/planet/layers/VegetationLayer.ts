@@ -145,9 +145,11 @@ export class VegetationLayer implements LayerController {
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
     const stageTwoGrassPatchCount =
-      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 45 : 0
+      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : 0
     const totalVisibleGrassPatchCount =
       stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
+    const unifiedGrassPatchScale =
+      (stageOneDay != null && stageOneDay >= 2) || stageTwoDay != null ? 0.3 : null
 
     if (totalVisibleGrassPatchCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇首次需要显示时懒加载一次。
@@ -158,6 +160,9 @@ export class VegetationLayer implements LayerController {
       const patch = this.grassPatches[i]
       if (!patch) continue
       patch.visible = i < totalVisibleGrassPatchCount
+      if (unifiedGrassPatchScale != null) {
+        patch.scale.setScalar(unifiedGrassPatchScale)
+      }
     }
 
     const visibleLowpolyGrassCount = 0

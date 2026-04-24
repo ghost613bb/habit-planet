@@ -6,7 +6,7 @@ import { TerrainLayer } from './TerrainLayer'
 import { VegetationLayer } from './VegetationLayer'
 
 describe('阶段 2 早期植被', () => {
-  it('第 4-5 天使用比第一阶段更大的顶部泛绿范围，但保留同一套泛绿基调', () => {
+  it('第 4-5 天使用比第一阶段更大的顶部泛绿范围，且第 5 天比第 4 天继续扩大', () => {
     resetPlanetGrassOverlay()
     const parentGroup = new Group()
     const grassMesh = new Mesh(
@@ -61,9 +61,19 @@ describe('阶段 2 早期植被', () => {
       irregularity: 0.1,
       color: '#7b9452',
     })
-    expect(stageTwoDayFiveOverlay).toEqual(stageTwoDayFourOverlay)
+    expect(stageTwoDayFiveOverlay).toEqual({
+      strength: 0.9,
+      radius: 1.38,
+      feather: 0.46,
+      topStart: 0.52,
+      topEnd: 0.9,
+      irregularity: 0.1,
+      color: '#7b9452',
+    })
     expect(stageTwoDayFourOverlay.radius).toBeGreaterThan(stageOneDayThreeOverlay.radius)
     expect(stageTwoDayFourOverlay.topStart).toBeLessThan(stageOneDayThreeOverlay.topStart)
+    expect(stageTwoDayFiveOverlay.radius).toBeGreaterThan(stageTwoDayFourOverlay.radius)
+    expect(stageTwoDayFiveOverlay.topStart).toBeLessThan(stageTwoDayFourOverlay.topStart)
     expect(grassMesh.visible).toBe(true)
   })
 
@@ -88,10 +98,14 @@ describe('阶段 2 早期植被', () => {
     const visibleBushCount = bushes.filter((item) => item.visible).length
     const visibleTreeCount = trees.filter((item) => item.visible).length
     const visibleGrassPatchCount = grassPatches.filter((item) => item.visible).length
+    const firstVisibleGrassPatch = grassPatches.find((item) => item.visible) as Object3D & {
+      scale: { x: number }
+    }
 
     expect(visibleBushCount).toBe(3)
     expect(visibleTreeCount).toBe(0)
     expect(visibleGrassPatchCount).toBe(32)
+    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.27)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -152,6 +166,9 @@ describe('阶段 2 早期植被', () => {
       ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
     const getVisibleGrassPatchCount = () =>
       ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
+    const getFirstVisibleGrassPatchScale = () =>
+      ((((vegetationLayer as any).grassPatches as Object3D[]).find((item) => item.visible) as Object3D | undefined)
+        ?.scale.x ?? 0)
     const getVisibleGrassPatchMinNormalizedY = () =>
       ((vegetationLayer as any).grassPatches as Object3D[])
         .filter((item) => item.visible)
@@ -175,7 +192,8 @@ describe('阶段 2 早期植被', () => {
     expect(getVisibleBushCount()).toBe(5)
     expect(getVisibleTreeCount()).toBe(1)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
-    expect(getVisibleGrassPatchCount()).toBe(45)
+    expect(getVisibleGrassPatchCount()).toBe(41)
+    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.27)
     expect(dayFourGrassPatchMinNormalizedY).toBeLessThan(stageOneDayThreeGrassPatchMinNormalizedY)
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
   })

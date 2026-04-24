@@ -35,6 +35,13 @@ const STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY = {
   topStart: 0.58,
 } as const
 
+const STAGE_TWO_DAY_FIVE_OVERLAY = {
+  ...STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
+  radius: 1.38,
+  feather: 0.46,
+  topStart: 0.52,
+} as const
+
 export class TerrainLayer implements LayerController {
   id = 'terrain'
 
@@ -101,8 +108,10 @@ export class TerrainLayer implements LayerController {
     }
 
     if (stageTwoDay != null && stageTwoDay <= 5) {
-      // 第二阶段第 4-5 天保留第一阶段的泛绿基调，但范围中幅扩大，让草地更开阔。
-      setPlanetGrassOverlay(STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY)
+      // 第二阶段第 4 天与第 5 天都保留泛绿基调，但第 5 天再额外扩大范围。
+      setPlanetGrassOverlay(
+        stageTwoDay === 5 ? STAGE_TWO_DAY_FIVE_OVERLAY : STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
+      )
     } else {
       resetPlanetGrassOverlay()
     }
