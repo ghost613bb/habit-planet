@@ -8,6 +8,12 @@ import {
 
 import { mats } from '../assets/Materials'
 import { getSurfaceTransform } from '../math/PlanetMath'
+import {
+  CAMPFIRE_GLOW_RADIUS_OFFSET,
+  CAMPFIRE_LIGHT_RADIUS_OFFSET,
+  CAMPFIRE_SURFACE_PHI,
+  CAMPFIRE_SURFACE_THETA,
+} from './campfirePlacement'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
 type FxLayerOptions = {
@@ -92,14 +98,14 @@ export class FxLayer implements LayerController {
 
   private setupTransforms() {
     const campfireTransform = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.12, 1.1),
-      this.planetRadius + 0.1,
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
+      this.planetRadius + CAMPFIRE_LIGHT_RADIUS_OFFSET,
     )
     this.campfireLight.position.copy(campfireTransform.pos)
 
     const campfireGlowTransform = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.12, 1.1),
-      this.planetRadius + 0.05,
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
+      this.planetRadius + CAMPFIRE_GLOW_RADIUS_OFFSET,
     )
     this.campfireGlow.position.copy(campfireGlowTransform.pos)
     this.campfireGlow.quaternion.copy(campfireGlowTransform.quaternion)

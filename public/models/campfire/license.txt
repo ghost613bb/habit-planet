@@ -1,0 +1,11 @@
+Model Information:
+* title:	Campfire
+* source:	https://sketchfab.com/3d-models/campfire-f168e4610f594788979ca259691c3ce4
+* author:	varun_malhotra1 (https://sketchfab.com/varun_malhotra1)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Campfire" (https://sketchfab.com/3d-models/campfire-f168e4610f594788979ca259691c3ce4) by varun_malhotra1 (https://sketchfab.com/varun_malhotra1) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

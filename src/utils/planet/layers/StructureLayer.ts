@@ -1,13 +1,23 @@
 import {
+  Box3,
   BoxGeometry,
   CylinderGeometry,
   Group,
+  LoadingManager,
   Mesh,
   Vector3,
 } from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
 import { getSurfaceTransform } from '../math/PlanetMath'
+import {
+  CAMPFIRE_MODEL_TARGET_HEIGHT,
+  CAMPFIRE_MODEL_YAW,
+  CAMPFIRE_STRUCTURE_RADIUS_OFFSET,
+  CAMPFIRE_SURFACE_PHI,
+  CAMPFIRE_SURFACE_THETA,
+} from './campfirePlacement'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
 type StructureLayerOptions = {
@@ -22,6 +32,9 @@ export class StructureLayer implements LayerController {
   private planetRadius: number
   private group: Group
   private campfire: Group
+  private campfireTemplate: Group | null = null
+  private campfireLoader = new GLTFLoader(new LoadingManager())
+  private campfireLoadPromise: Promise<void> | null = null
   private hutSkeleton: Group
   private hutFull: Group
   private windmill: Group
@@ -54,7 +67,40 @@ export class StructureLayer implements LayerController {
   }
 
   preload(): Promise<void> {
-    return Promise.resolve()
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.campfireLoadPromise) {
+        this.campfireTemplate = new Group()
+        this.attachCampfireInstance()
+        this.campfireLoadPromise = Promise.resolve()
+      }
+
+      return this.campfireLoadPromise
+    }
+
+    if (!this.campfireLoadPromise) {
+      const campfireUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/campfire/scene.gltf', globalThis.location.origin).toString()
+          : '/models/campfire/scene.gltf'
+
+      this.campfireLoadPromise = new Promise((resolve, reject) => {
+        this.campfireLoader.load(
+          campfireUrl,
+          (gltf) => {
+            this.campfireTemplate = gltf.scene.clone(true)
+            this.attachCampfireInstance()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.campfireLoadPromise
   }
 
   activate(input: LayerUpdateInput) {
@@ -62,6 +108,11 @@ export class StructureLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
+    if (input.stageIndex >= 2) {
+      // 真实运行链路不会主动预加载，这里在第一次需要展示篝火时懒加载一次。
+      void this.preload()
+    }
+
     this.campfire.visible = input.stageIndex >= 2
     this.hutSkeleton.visible = input.stageIndex === 3
     this.hutFull.visible = input.stageIndex >= 4
@@ -87,29 +138,34 @@ export class StructureLayer implements LayerController {
 
   private createCampfire() {
     const group = new Group()
-    const logGeometry = new CylinderGeometry(0.025, 0.03, 0.35, 6)
-
-    for (let i = 0; i < 3; i += 1) {
-      const log = new Mesh(logGeometry, mats.trunk)
-      log.rotation.z = Math.PI / 2
-      log.rotation.y = (Math.PI / 3) * i
-      log.position.y = 0.03
-      group.add(log)
-    }
-
-    const flame = new Mesh(new CylinderGeometry(0.02, 0.08, 0.22, 6), mats.houseRoof)
-    flame.position.y = 0.18
-    group.add(flame)
 
     const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.12, 1.1),
-      this.planetRadius + 0.02,
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
+      this.planetRadius + CAMPFIRE_STRUCTURE_RADIUS_OFFSET,
     )
     group.position.copy(pos)
     group.quaternion.copy(quaternion)
     group.visible = false
 
     return group
+  }
+
+  private attachCampfireInstance() {
+    this.campfire.clear()
+    if (!this.campfireTemplate) return
+
+    const instance = this.campfireTemplate.clone(true)
+    const bounds = new Box3().setFromObject(instance)
+    const size = bounds.getSize(new Vector3())
+    const center = bounds.getCenter(new Vector3())
+    const safeHeight = Math.max(size.y, 0.001)
+    const scale = CAMPFIRE_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.scale.setScalar(scale)
+    instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
+    instance.rotation.y = CAMPFIRE_MODEL_YAW
+
+    this.campfire.add(instance)
   }
 
   private createHutSkeleton() {
