@@ -146,4 +146,48 @@ function onDayInput(event: Event) {
 .wide {
   width: 100%;
 }
+
+@media (max-width: 720px) {
+  .debugCard {
+    margin-top: 8px;
+    border-radius: 10px;
+  }
+
+  .debugToggle {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .debugBody {
+    padding: 0 10px 10px;
+  }
+
+  .debugRow {
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  .shortcutGrid {
+    gap: 6px;
+    margin: 8px 0;
+  }
+
+  .shortcutBtn,
+  .actionChip {
+    padding: 6px 8px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .customJump {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .dayInput {
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+}
 </style>
