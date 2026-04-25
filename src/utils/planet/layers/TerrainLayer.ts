@@ -42,6 +42,15 @@ const STAGE_TWO_DAY_FIVE_OVERLAY = {
   topStart: 0.52,
 } as const
 
+const STAGE_TWO_DAY_SIX_OVERLAY = {
+  ...STAGE_TWO_DAY_FIVE_OVERLAY,
+  radius: 1.52,
+  feather: 0.54,
+  topStart: 0.44,
+  topEnd: 0.88,
+  irregularity: 0.14,
+} as const
+
 export class TerrainLayer implements LayerController {
   id = 'terrain'
 
@@ -107,10 +116,14 @@ export class TerrainLayer implements LayerController {
       return
     }
 
-    if (stageTwoDay != null && stageTwoDay <= 5) {
-      // 第二阶段第 4 天与第 5 天都保留泛绿基调，但第 5 天再额外扩大范围。
+    if (stageTwoDay != null && stageTwoDay <= 6) {
+      // 第二阶段第 4-6 天都保留泛绿基调，并在第 6 天继续扩大顶部覆盖范围。
       setPlanetGrassOverlay(
-        stageTwoDay === 5 ? STAGE_TWO_DAY_FIVE_OVERLAY : STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
+        stageTwoDay >= 6
+          ? STAGE_TWO_DAY_SIX_OVERLAY
+          : stageTwoDay === 5
+            ? STAGE_TWO_DAY_FIVE_OVERLAY
+            : STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
       )
     } else {
       resetPlanetGrassOverlay()
@@ -123,7 +136,7 @@ export class TerrainLayer implements LayerController {
 
     this.rocks.visible = input.stageIndex <= 2
     if (stageTwoDay != null) {
-      this.rocks.count = stageTwoDay === 4 ? 5 : stageTwoDay === 5 ? 6 : 8
+      this.rocks.count = stageTwoDay === 4 ? 5 : stageTwoDay === 5 ? 6 : 7
       return
     }
 

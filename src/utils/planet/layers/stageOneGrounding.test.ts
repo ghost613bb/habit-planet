@@ -2,6 +2,7 @@ import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry, Vector3 } f
 import { describe, expect, it } from 'vitest'
 
 import { getPlanetGrassOverlayState, mats, resetPlanetGrassOverlay } from '../assets/Materials'
+import { CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA } from './campfirePlacement'
 import {
   getPlacementTransform,
 } from '../math/PlanetMath'
@@ -158,5 +159,79 @@ describe('阶段 1 贴地与遮挡', () => {
     expect((visiblePatch?.scale.y ?? 0)).toBeGreaterThan(0.2)
     expect((visiblePatch?.scale.y ?? 0)).toBeLessThan(sprout.scale.y)
     expect(visiblePatch?.position.length() ?? 0).toBeLessThan(sprout.position.length())
+  })
+
+  it('第 6 天会比第 5 天新增树、增加草簇，并扩大顶部泛绿', () => {
+    resetPlanetGrassOverlay()
+    const parentGroup = new Group()
+    const grassMesh = new Mesh(
+      new SphereGeometry(3.05, 16, 16),
+      new MeshLambertMaterial({ color: '#6b7045' }),
+    )
+    const terrainLayer = new TerrainLayer({
+      parentGroup,
+      grassMesh,
+      planetRadius: 3,
+    })
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    const dayFiveInput = {
+      dayCount: 5,
+      stageIndex: 2 as const,
+      stageProgress: 0.5,
+      qualityTier: 'tier-1' as const,
+    }
+    const daySixInput = {
+      dayCount: 6,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    }
+
+    const getVisibleTreeCount = () =>
+      ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
+    const getVisibleBushCount = () =>
+      ((vegetationLayer as any).bushes as Object3D[]).filter((item) => item.visible).length
+    const getVisibleGrassPatchCount = () =>
+      ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
+    const grassPatches = (vegetationLayer as any).grassPatches as Group[]
+    const trees = (vegetationLayer as any).trees as Group[]
+
+    terrainLayer.update(dayFiveInput)
+    vegetationLayer.update(dayFiveInput)
+    const dayFiveOverlay = getPlanetGrassOverlayState()
+    const dayFiveTreeCount = getVisibleTreeCount()
+    const dayFiveBushCount = getVisibleBushCount()
+    const dayFiveGrassPatchCount = getVisibleGrassPatchCount()
+
+    terrainLayer.update(daySixInput)
+    vegetationLayer.update(daySixInput)
+    const daySixOverlay = getPlanetGrassOverlayState()
+
+    expect(dayFiveTreeCount).toBe(1)
+    expect(dayFiveBushCount).toBe(5)
+    expect(dayFiveGrassPatchCount).toBe(41)
+    expect(getVisibleBushCount()).toBeGreaterThanOrEqual(dayFiveBushCount)
+    expect(getVisibleBushCount()).toBe(5)
+    expect(getVisibleTreeCount()).toBe(2)
+    expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFiveGrassPatchCount)
+    expect(getVisibleGrassPatchCount()).toBe(45)
+    expect(daySixOverlay.radius).toBeGreaterThan(dayFiveOverlay.radius)
+    expect(daySixOverlay.topStart).toBeLessThan(dayFiveOverlay.topStart)
+
+    const campfirePos = getPlacementTransform(
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
+      3,
+      'default',
+    ).pos
+    const extraPatchPositions = grassPatches.slice(41, 45).map((item) => item.position)
+    extraPatchPositions.forEach((position) => {
+      expect(position.distanceTo(trees[0]!.position)).toBeGreaterThan(1.05)
+      expect(position.distanceTo(trees[1]!.position)).toBeGreaterThan(0.95)
+      expect(position.distanceTo(campfirePos)).toBeGreaterThan(1)
+    })
   })
 })

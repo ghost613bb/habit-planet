@@ -119,13 +119,13 @@ export class VegetationLayer implements LayerController {
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
     const stageTwoGrassPatchCount =
-      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : 0
+      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : 52
     const totalVisibleGrassPatchCount =
       stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
     const unifiedGrassPatchScale =
       (stageOneDay != null && stageOneDay >= 2) || stageTwoDay != null ? 0.3 : null
     const visibleTreeCount =
-      input.stageIndex === 1 ? 0 : stageTwoDay === 4 ? 0 : 1 + Math.round(input.stageProgress * 2)
+      input.stageIndex === 1 ? 0 : stageTwoDay === 4 ? 0 : stageTwoDay === 5 ? 1 : 2
 
     if (totalVisibleGrassPatchCount > 0 || visibleTreeCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇或树首次需要显示时懒加载一次。
@@ -146,7 +146,7 @@ export class VegetationLayer implements LayerController {
         ? 0
         : stageTwoDay === 4
           ? 3
-          : stageTwoDay === 5
+          : stageTwoDay != null && stageTwoDay >= 5
             ? 5
             : 2 + Math.round(input.stageProgress * 2)
     for (let i = 0; i < this.bushes.length; i += 1) {
@@ -271,6 +271,17 @@ export class VegetationLayer implements LayerController {
         scale: ring.scaleBase + (index % 3) * 0.012,
       })),
     )
+    const stageSixExtraAnchors = [
+      { phi: 0.43, theta: 1.78, scale: 0.333 },
+      { phi: 0.46, theta: 3.32, scale: 0.341 },
+      { phi: 0.41, theta: 4.18, scale: 0.337 },
+      { phi: 0.52, theta: 5.56, scale: 0.345 },
+    ]
+    // 第 6 天新增草簇必须继承第 5 天前 41 个锚点，只替换最后 4 个新增锚点，
+    // 并把它们手工挪到远离第一棵树、第二棵树和篝火的安全区域。
+    stageSixExtraAnchors.forEach((anchor, index) => {
+      anchors[41 + index] = anchor
+    })
 
     return anchors.map((anchor, index) => {
       const patch = new Group()
