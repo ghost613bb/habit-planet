@@ -17,7 +17,7 @@ const planetGrassOverlayState = {
   topStart: 0.72,
   topEnd: 0.9,
   irregularity: 0.08,
-  color: new Color('#7c9554'),
+  color: new Color('#4b8534'),
 }
 
 function syncPlanetGrassOverlayUniforms(material: MeshStandardMaterial) {
@@ -114,7 +114,7 @@ export function resetPlanetGrassOverlay() {
     topStart: 0.72,
     topEnd: 0.9,
     irregularity: 0.08,
-    color: '#7c9554',
+    color: '#4b8534',
   })
 }
 

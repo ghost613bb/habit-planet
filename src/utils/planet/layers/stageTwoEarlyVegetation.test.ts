@@ -50,7 +50,7 @@ describe('阶段 2 早期植被', () => {
       topStart: 0.7,
       topEnd: 0.9,
       irregularity: 0.1,
-      color: '#7b9452',
+      color: '#4b8534',
     })
     expect(stageTwoDayFourOverlay).toEqual({
       strength: 0.9,
@@ -59,7 +59,7 @@ describe('阶段 2 早期植被', () => {
       topStart: 0.58,
       topEnd: 0.9,
       irregularity: 0.1,
-      color: '#7b9452',
+      color: '#4b8534',
     })
     expect(stageTwoDayFiveOverlay).toEqual({
       strength: 0.9,
@@ -68,7 +68,7 @@ describe('阶段 2 早期植被', () => {
       topStart: 0.52,
       topEnd: 0.9,
       irregularity: 0.1,
-      color: '#7b9452',
+      color: '#4b8534',
     })
     expect(stageTwoDayFourOverlay.radius).toBeGreaterThan(stageOneDayThreeOverlay.radius)
     expect(stageTwoDayFourOverlay.topStart).toBeLessThan(stageOneDayThreeOverlay.topStart)

@@ -25,7 +25,7 @@ const STAGE_ONE_DAY_THREE_OVERLAY = {
   topStart: 0.7,
   topEnd: 0.9,
   irregularity: 0.1,
-  color: '#7b9452',
+  color: '#4b8534',
 } as const
 
 const STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY = {
