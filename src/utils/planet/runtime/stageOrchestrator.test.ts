@@ -11,11 +11,11 @@ describe('stageOrchestrator', () => {
     }
     const orchestrator = createStageOrchestrator(controller)
 
-    orchestrator.update(12)
-    orchestrator.update(13)
+    orchestrator.update(4)
+    orchestrator.update(5)
 
     expect(controller.applySnapshot).toHaveBeenLastCalledWith(
-      expect.objectContaining({ stageIndex: 3 }),
+      expect.objectContaining({ stageIndex: 2 }),
     )
     expect(controller.playMilestoneTransition).not.toHaveBeenCalled()
   })
@@ -28,9 +28,30 @@ describe('stageOrchestrator', () => {
     }
     const orchestrator = createStageOrchestrator(controller)
 
-    orchestrator.update(21)
-    orchestrator.update(22)
+    orchestrator.update(3)
+    orchestrator.update(4)
 
     expect(controller.playMilestoneTransition).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps visuals fixed at day five after day 6', () => {
+    const controller = {
+      applySnapshot: vi.fn(),
+      playMilestoneTransition: vi.fn(),
+      jumpToSnapshot: vi.fn(),
+    }
+    const orchestrator = createStageOrchestrator(controller)
+
+    orchestrator.update(5)
+    orchestrator.update(6)
+
+    expect(controller.playMilestoneTransition).not.toHaveBeenCalled()
+    expect(controller.applySnapshot).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        dayCount: 5,
+        stageIndex: 2,
+        stageProgress: 0.1667,
+      }),
+    )
   })
 })

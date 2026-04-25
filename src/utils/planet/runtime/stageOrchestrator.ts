@@ -1,6 +1,8 @@
 import type { PlanetQualityTier, StageRuntimeSnapshot } from '../types'
 import { buildStageSnapshot } from './stageRuntime'
 
+const MAX_RENDER_DAY_COUNT = 5
+
 export type StageOrchestratorController = {
   applySnapshot: (snapshot: StageRuntimeSnapshot & { qualityTier: PlanetQualityTier }) => void
   playMilestoneTransition: (
@@ -24,6 +26,11 @@ export function createStageOrchestrator(
     }
   }
 
+  function buildRenderSnapshot(dayCount: number) {
+    // 第 6 天及以后先固定显示第 5 天画面，只影响渲染链路，不改真实进度值。
+    return withQuality(buildStageSnapshot(Math.min(dayCount, MAX_RENDER_DAY_COUNT)))
+  }
+
   return {
     getCurrentSnapshot() {
       return currentSnapshot
@@ -39,7 +46,7 @@ export function createStageOrchestrator(
       }
     },
     update(dayCount: number) {
-      const nextSnapshot = withQuality(buildStageSnapshot(dayCount))
+      const nextSnapshot = buildRenderSnapshot(dayCount)
 
       if (!currentSnapshot) {
         currentSnapshot = nextSnapshot
@@ -59,7 +66,7 @@ export function createStageOrchestrator(
       controller.playMilestoneTransition(previousSnapshot, nextSnapshot)
     },
     jump(dayCount: number) {
-      const nextSnapshot = withQuality(buildStageSnapshot(dayCount))
+      const nextSnapshot = buildRenderSnapshot(dayCount)
       currentSnapshot = nextSnapshot
       controller.jumpToSnapshot(nextSnapshot)
     },
