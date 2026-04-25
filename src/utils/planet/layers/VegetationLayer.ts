@@ -229,7 +229,7 @@ export class VegetationLayer implements LayerController {
 
   private createTrees() {
     const anchors = [
-      { phi: 0.22, theta: 0.8 },
+      { phi: 0.31, theta: 0.18 },
       { phi: 0.2, theta: 2.7 },
       { phi: 0.24, theta: 4.8 },
     ]
@@ -256,8 +256,8 @@ export class VegetationLayer implements LayerController {
     const ringConfigs = [
       { count: 8, phiBase: 0.08, phiJitter: 0.015, thetaOffset: 0.1, thetaJitter: 0, scaleBase: 0.27 },
       { count: 8, phiBase: 0.14, phiJitter: 0.02, thetaOffset: 0.35, thetaJitter: 0, scaleBase: 0.285 },
-      { count: 12, phiBase: 0.238, phiJitter: 0.032, thetaOffset: 0.12, thetaJitter: 0.15, scaleBase: 0.3 },
-      { count: 17, phiBase: 0.34, phiJitter: 0.036, thetaOffset: 0.3, thetaJitter: 0.17, scaleBase: 0.315 },
+      { count: 12, phiBase: 0.26, phiJitter: 0.032, thetaOffset: 0.12, thetaJitter: 0.2, scaleBase: 0.3 },
+      { count: 17, phiBase: 0.375, phiJitter: 0.036, thetaOffset: 0.3, thetaJitter: 0.22, scaleBase: 0.315 },
     ]
     const anchors = ringConfigs.flatMap((ring) =>
       Array.from({ length: ring.count }, (_, index) => ({
@@ -303,7 +303,7 @@ export class VegetationLayer implements LayerController {
       tree.clear()
       tree.add(
         createLeafyTreeInstance({
-          targetHeight: 0.7,
+          targetHeight: index === 0 ? 0.82 : 0.7,
           rotationY: index * 0.9,
         }),
       )
