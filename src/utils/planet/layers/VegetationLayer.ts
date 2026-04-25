@@ -119,7 +119,7 @@ export class VegetationLayer implements LayerController {
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
     const stageTwoGrassPatchCount =
-      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : 52
+      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : 49
     const totalVisibleGrassPatchCount =
       stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
     const unifiedGrassPatchScale =
@@ -276,14 +276,16 @@ export class VegetationLayer implements LayerController {
       { phi: 0.46, theta: 3.32, scale: 0.341 },
       { phi: 0.41, theta: 4.18, scale: 0.337 },
       { phi: 0.52, theta: 5.56, scale: 0.345 },
+      { phi: 0.56, theta: 1.42, scale: 0.334 },
+      { phi: 0.5, theta: 2.24, scale: 0.339 },
+      { phi: 0.48, theta: 4.52, scale: 0.342 },
+      { phi: 0.54, theta: 3.92, scale: 0.348 },
     ]
-    // 第 6 天新增草簇必须继承第 5 天前 41 个锚点，只替换最后 4 个新增锚点，
-    // 并把它们手工挪到远离第一棵树、第二棵树和篝火的安全区域。
-    stageSixExtraAnchors.forEach((anchor, index) => {
-      anchors[41 + index] = anchor
-    })
+    // 第 6 天新增草簇必须继承第 5 天前 41 个锚点，只在其后继续追加新增锚点，
+    // 并把新增锚点放到远离树和篝火的安全区域。
+    const accumulatedAnchors = [...anchors.slice(0, 41), ...stageSixExtraAnchors]
 
-    return anchors.map((anchor, index) => {
+    return accumulatedAnchors.map((anchor, index) => {
       const patch = new Group()
       const { pos, quaternion } = getPlacementTransform(
         new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),

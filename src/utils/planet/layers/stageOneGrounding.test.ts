@@ -218,7 +218,7 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(getVisibleBushCount()).toBe(5)
     expect(getVisibleTreeCount()).toBe(2)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFiveGrassPatchCount)
-    expect(getVisibleGrassPatchCount()).toBe(45)
+    expect(getVisibleGrassPatchCount()).toBe(49)
     expect(daySixOverlay.radius).toBeGreaterThan(dayFiveOverlay.radius)
     expect(daySixOverlay.topStart).toBeLessThan(dayFiveOverlay.topStart)
 
@@ -227,7 +227,7 @@ describe('阶段 1 贴地与遮挡', () => {
       3,
       'default',
     ).pos
-    const extraPatchPositions = grassPatches.slice(41, 45).map((item) => item.position)
+    const extraPatchPositions = grassPatches.slice(41, 49).map((item) => item.position)
     extraPatchPositions.forEach((position) => {
       expect(position.distanceTo(trees[0]!.position)).toBeGreaterThan(1.05)
       expect(position.distanceTo(trees[1]!.position)).toBeGreaterThan(0.95)
