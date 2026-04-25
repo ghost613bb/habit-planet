@@ -1,7 +1,9 @@
 import {
+  Color,
   CylinderGeometry,
   Group,
   LoadingManager,
+  MeshStandardMaterial,
   Mesh,
   SphereGeometry,
   Vector3,
@@ -293,6 +295,15 @@ export class VegetationLayer implements LayerController {
       if (!this.grassPatchTemplate) return
 
       const instance = this.grassPatchTemplate.clone(true)
+      instance.traverse((child) => {
+        if (!(child instanceof Mesh)) return
+        const material = child.material
+        if (!(material instanceof MeshStandardMaterial)) return
+        child.material = material.clone()
+        child.material.color.set(new Color('#a7db86'))
+        child.material.emissive.set(new Color('#4f7f36'))
+        child.material.emissiveIntensity = 0.22
+      })
       instance.rotation.y = index * 0.9
       patch.add(instance)
     })
