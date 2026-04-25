@@ -105,7 +105,7 @@ export class VegetationLayer implements LayerController {
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoDay = input.stageIndex === 2 ? Math.max(4, Math.floor(input.dayCount)) : null
 
-    this.sprout.visible = true
+    this.sprout.visible = input.stageIndex === 1
     if (stageOneDay != null) {
       // 第 1-3 天让幼苗有明确长高过程，便于用户一眼感知变化。
       const stageOneSproutScale = stageOneDay === 1 ? 0.62 : stageOneDay === 2 ? 0.72 : 0.86
