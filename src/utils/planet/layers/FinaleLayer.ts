@@ -1,6 +1,5 @@
 import {
   BufferGeometry,
-  Color,
   Float32BufferAttribute,
   Group,
   Mesh,
@@ -12,6 +11,7 @@ import {
   Vector3,
 } from 'three'
 
+import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
 import { getSurfaceTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
@@ -30,6 +30,7 @@ export class FinaleLayer implements LayerController {
   private haloInner: Mesh
   private haloOuter: Mesh
   private stardust: Points
+  private lifeTreeLoadPromise: Promise<void> | null = null
 
   constructor(options: FinaleLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -37,7 +38,7 @@ export class FinaleLayer implements LayerController {
     this.group = new Group()
     this.parentGroup.add(this.group)
 
-    this.lifeTree = this.createLifeTree()
+    this.lifeTree = this.createLifeTreeAnchor()
     this.haloInner = this.createHalo(4.08, 4.16, 0x8ff7ff)
     this.haloOuter = this.createHalo(4.32, 4.42, 0xfff2a8)
     this.stardust = this.createStardust()
@@ -47,7 +48,13 @@ export class FinaleLayer implements LayerController {
   }
 
   preload(): Promise<void> {
-    return Promise.resolve()
+    if (!this.lifeTreeLoadPromise) {
+      this.lifeTreeLoadPromise = preloadLeafyTreeTemplate().then(() => {
+        this.attachLifeTreeInstance()
+      })
+    }
+
+    return this.lifeTreeLoadPromise
   }
 
   activate(input: LayerUpdateInput) {
@@ -85,29 +92,8 @@ export class FinaleLayer implements LayerController {
     this.stardust.geometry.dispose()
   }
 
-  private createLifeTree() {
+  private createLifeTreeAnchor() {
     const group = new Group()
-    const trunk = new Mesh(
-      new SphereGeometry(0.18, 10, 10),
-      new MeshBasicMaterial({ color: 0x6c4b2a }),
-    )
-    trunk.scale.set(0.9, 2.2, 0.9)
-    trunk.position.y = 0.4
-
-    const canopy = new Mesh(
-      new SphereGeometry(0.46, 16, 16),
-      new MeshBasicMaterial({ color: new Color('#8ff7ff') }),
-    )
-    canopy.position.y = 1.02
-    canopy.scale.set(1.25, 1, 1.25)
-
-    const crown = new Mesh(
-      new SphereGeometry(0.16, 10, 10),
-      new MeshBasicMaterial({ color: new Color('#dffcff') }),
-    )
-    crown.position.set(0.18, 1.18, -0.1)
-
-    group.add(trunk, canopy, crown)
 
     const { pos, quaternion } = getSurfaceTransform(
       new Vector3().setFromSphericalCoords(1, 0.15, 5.25),
@@ -117,6 +103,16 @@ export class FinaleLayer implements LayerController {
     group.quaternion.copy(quaternion)
 
     return group
+  }
+
+  private attachLifeTreeInstance() {
+    this.lifeTree.clear()
+    this.lifeTree.add(
+      createLeafyTreeInstance({
+        targetHeight: 1.85,
+        rotationY: 0.35,
+      }),
+    )
   }
 
   private createHalo(innerRadius: number, outerRadius: number, color: number) {

@@ -164,6 +164,8 @@ describe('阶段 2 早期植被', () => {
       ((vegetationLayer as any).bushes as Object3D[]).filter((item) => item.visible).length
     const getVisibleTreeCount = () =>
       ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
+    const getFirstVisibleTree = () =>
+      (((vegetationLayer as any).trees as Object3D[]).find((item) => item.visible) as Object3D | undefined)
     const getVisibleGrassPatchCount = () =>
       ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
     const getFirstVisibleGrassPatchScale = () =>
@@ -191,6 +193,7 @@ describe('阶段 2 早期植被', () => {
 
     expect(getVisibleBushCount()).toBe(5)
     expect(getVisibleTreeCount()).toBe(1)
+    expect(getFirstVisibleTree()?.children.length ?? 0).toBeGreaterThan(0)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
     expect(getVisibleGrassPatchCount()).toBe(41)
     expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.3)
