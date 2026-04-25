@@ -45,27 +45,27 @@ describe('阶段 2 早期植被', () => {
 
     expect(stageOneDayThreeOverlay).toEqual({
       strength: 0.9,
-      radius: 1.02,
-      feather: 0.28,
-      topStart: 0.7,
+      radius: 1.52,
+      feather: 0.56,
+      topStart: 0.5,
       topEnd: 0.9,
       irregularity: 0.1,
       color: '#4b8534',
     })
     expect(stageTwoDayFourOverlay).toEqual({
       strength: 0.9,
-      radius: 1.28,
-      feather: 0.4,
-      topStart: 0.58,
+      radius: 1.98,
+      feather: 0.82,
+      topStart: 0.28,
       topEnd: 0.9,
       irregularity: 0.1,
       color: '#4b8534',
     })
     expect(stageTwoDayFiveOverlay).toEqual({
       strength: 0.9,
-      radius: 1.38,
-      feather: 0.46,
-      topStart: 0.52,
+      radius: 2.18,
+      feather: 0.9,
+      topStart: 0.22,
       topEnd: 0.9,
       irregularity: 0.1,
       color: '#4b8534',
@@ -105,7 +105,7 @@ describe('阶段 2 早期植被', () => {
     expect(visibleBushCount).toBe(3)
     expect(visibleTreeCount).toBe(0)
     expect(visibleGrassPatchCount).toBe(32)
-    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.3)
+    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.525)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -196,7 +196,7 @@ describe('阶段 2 早期植被', () => {
     expect(getFirstVisibleTree()?.children.length ?? 0).toBeGreaterThan(0)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
     expect(getVisibleGrassPatchCount()).toBe(41)
-    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.3)
+    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.525)
     expect(dayFourGrassPatchMinNormalizedY).toBeLessThan(stageOneDayThreeGrassPatchMinNormalizedY)
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
   })

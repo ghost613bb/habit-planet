@@ -12,6 +12,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
+import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
 import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
@@ -19,6 +20,12 @@ type VegetationLayerOptions = {
   parentGroup: Group
   planetRadius: number
 }
+
+const SPROUT_SCALE_BOOST = 1.55
+const BUSH_SCALE_BOOST = 1.7
+const GRASS_PATCH_SCALE_BOOST = 1.75
+const LEAFY_TREE_SCALE_BOOST = 1.68
+const WIDE_TREE_SCALE_BOOST = 1.58
 
 export class VegetationLayer implements LayerController {
   id = 'vegetation'
@@ -34,6 +41,7 @@ export class VegetationLayer implements LayerController {
   private grassPatchLoader = new GLTFLoader(new LoadingManager())
   private grassPatchLoadPromise: Promise<void> | null = null
   private leafyTreeLoadPromise: Promise<void> | null = null
+  private lowPolyWideTreeLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -91,7 +99,17 @@ export class VegetationLayer implements LayerController {
       })
     }
 
-    return Promise.all([this.grassPatchLoadPromise, this.leafyTreeLoadPromise]).then(() => undefined)
+    if (!this.lowPolyWideTreeLoadPromise) {
+      this.lowPolyWideTreeLoadPromise = preloadLowPolyWideTreeTemplate().then(() => {
+        this.attachTreeInstances()
+      })
+    }
+
+    return Promise.all([
+      this.grassPatchLoadPromise,
+      this.leafyTreeLoadPromise,
+      this.lowPolyWideTreeLoadPromise,
+    ]).then(() => undefined)
   }
 
   activate(input: LayerUpdateInput) {
@@ -111,21 +129,21 @@ export class VegetationLayer implements LayerController {
     if (stageOneDay != null) {
       // 第 1-3 天让幼苗有明确长高过程，便于用户一眼感知变化。
       const stageOneSproutScale = stageOneDay === 1 ? 0.62 : stageOneDay === 2 ? 0.72 : 0.86
-      this.sprout.scale.setScalar(stageOneSproutScale)
+      this.sprout.scale.setScalar(stageOneSproutScale * SPROUT_SCALE_BOOST)
     } else {
-      this.sprout.scale.setScalar(0.55 + input.stageProgress * 0.45)
+      this.sprout.scale.setScalar((0.55 + input.stageProgress * 0.45) * SPROUT_SCALE_BOOST)
     }
 
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
     const stageTwoGrassPatchCount =
-      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : 49
+      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : stageTwoDay === 6 ? 49 : 98
     const totalVisibleGrassPatchCount =
       stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
     const unifiedGrassPatchScale =
-      (stageOneDay != null && stageOneDay >= 2) || stageTwoDay != null ? 0.3 : null
+      (stageOneDay != null && stageOneDay >= 2) || stageTwoDay != null ? 0.3 * GRASS_PATCH_SCALE_BOOST : null
     const visibleTreeCount =
-      input.stageIndex === 1 ? 0 : stageTwoDay === 4 ? 0 : stageTwoDay === 5 ? 1 : 2
+      input.stageIndex === 1 ? 0 : stageTwoDay === 4 ? 0 : stageTwoDay === 5 ? 1 : stageTwoDay === 6 ? 2 : 3
 
     if (totalVisibleGrassPatchCount > 0 || visibleTreeCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇或树首次需要显示时懒加载一次。
@@ -153,7 +171,7 @@ export class VegetationLayer implements LayerController {
       const bush = this.bushes[i]
       if (!bush) continue
       bush.visible = i < visibleBushCount
-      bush.scale.setScalar(0.75 + input.stageProgress * 0.25)
+      bush.scale.setScalar((0.75 + input.stageProgress * 0.25) * BUSH_SCALE_BOOST)
     }
 
     for (let i = 0; i < this.trees.length; i += 1) {
@@ -202,8 +220,8 @@ export class VegetationLayer implements LayerController {
 
   private createBushes() {
     const anchors = [
-      { phi: 0.2, theta: 0.45 },
-      { phi: 0.18, theta: 1.6 },
+      { phi: 0.42, theta: 1.02 },
+      { phi: 0.38, theta: 1.46 },
       { phi: 0.24, theta: 2.4 },
       { phi: 0.16, theta: 5.1 },
       { phi: 0.14, theta: 3.6 },
@@ -231,8 +249,9 @@ export class VegetationLayer implements LayerController {
 
   private createTrees() {
     const anchors = [
-      { phi: 0.31, theta: 0.18 },
+      { phi: 0.48, theta: 5.72 },
       { phi: 0.2, theta: 2.7 },
+      { phi: 0.48, theta: 2.62 },
       { phi: 0.24, theta: 4.8 },
     ]
 
@@ -272,18 +291,32 @@ export class VegetationLayer implements LayerController {
       })),
     )
     const stageSixExtraAnchors = [
-      { phi: 0.43, theta: 1.78, scale: 0.333 },
-      { phi: 0.46, theta: 3.32, scale: 0.341 },
-      { phi: 0.41, theta: 4.18, scale: 0.337 },
-      { phi: 0.52, theta: 5.56, scale: 0.345 },
-      { phi: 0.56, theta: 1.42, scale: 0.334 },
-      { phi: 0.5, theta: 2.24, scale: 0.339 },
-      { phi: 0.48, theta: 4.52, scale: 0.342 },
-      { phi: 0.54, theta: 3.92, scale: 0.348 },
+      { phi: 0.5, theta: 1.62, scale: 0.333 },
+      { phi: 0.58, theta: 3.42, scale: 0.341 },
+      { phi: 0.52, theta: 4.26, scale: 0.337 },
+      { phi: 0.64, theta: 4.92, scale: 0.345 },
+      { phi: 0.6, theta: 1.18, scale: 0.334 },
+      { phi: 0.56, theta: 2.34, scale: 0.339 },
+      { phi: 0.58, theta: 4.74, scale: 0.342 },
+      { phi: 0.62, theta: 3.72, scale: 0.348 },
     ]
+    const stageSevenExtraAnchors = [
+      { count: 16, phiBase: 0.44, phiJitter: 0.026, thetaOffset: 0.18, thetaJitter: 0.12, scaleBase: 0.332 },
+      { count: 16, phiBase: 0.52, phiJitter: 0.028, thetaOffset: 0.44, thetaJitter: 0.14, scaleBase: 0.338 },
+      { count: 17, phiBase: 0.6, phiJitter: 0.03, thetaOffset: 0.14, thetaJitter: 0.16, scaleBase: 0.344 },
+    ].flatMap((ring) =>
+      Array.from({ length: ring.count }, (_, index) => ({
+        phi: ring.phiBase + (index % 2 === 0 ? ring.phiJitter : -ring.phiJitter * 0.8),
+        theta:
+          ring.thetaOffset +
+          (index / ring.count) * Math.PI * 2 +
+          (index % 3 === 0 ? ring.thetaJitter : index % 3 === 1 ? -ring.thetaJitter * 0.55 : ring.thetaJitter * 0.28),
+        scale: ring.scaleBase + (index % 3) * 0.01,
+      })),
+    )
     // 第 6 天新增草簇必须继承第 5 天前 41 个锚点，只在其后继续追加新增锚点，
     // 并把新增锚点放到远离树和篝火的安全区域。
-    const accumulatedAnchors = [...anchors.slice(0, 41), ...stageSixExtraAnchors]
+    const accumulatedAnchors = [...anchors.slice(0, 41), ...stageSixExtraAnchors, ...stageSevenExtraAnchors]
 
     return accumulatedAnchors.map((anchor, index) => {
       const patch = new Group()
@@ -325,9 +358,19 @@ export class VegetationLayer implements LayerController {
   private attachTreeInstances() {
     this.trees.forEach((tree, index) => {
       tree.clear()
+      if (index === 2) {
+        tree.add(
+          createLowPolyWideTreeInstance({
+            targetHeight: 0.88 * WIDE_TREE_SCALE_BOOST,
+            rotationY: 0.35,
+          }),
+        )
+        return
+      }
+
       tree.add(
         createLeafyTreeInstance({
-          targetHeight: index === 0 ? 0.82 : 0.7,
+          targetHeight: (index === 0 ? 0.82 : 0.7) * LEAFY_TREE_SCALE_BOOST,
           rotationY: index * 0.9,
         }),
       )

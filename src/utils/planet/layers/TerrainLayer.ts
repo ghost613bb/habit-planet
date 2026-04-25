@@ -20,9 +20,9 @@ type TerrainLayerOptions = {
 
 const STAGE_ONE_DAY_THREE_OVERLAY = {
   strength: 0.9,
-  radius: 1.02,
-  feather: 0.28,
-  topStart: 0.7,
+  radius: 1.52,
+  feather: 0.56,
+  topStart: 0.5,
   topEnd: 0.9,
   irregularity: 0.1,
   color: '#4b8534',
@@ -30,23 +30,23 @@ const STAGE_ONE_DAY_THREE_OVERLAY = {
 
 const STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY = {
   ...STAGE_ONE_DAY_THREE_OVERLAY,
-  radius: 1.28,
-  feather: 0.4,
-  topStart: 0.58,
+  radius: 1.98,
+  feather: 0.82,
+  topStart: 0.28,
 } as const
 
 const STAGE_TWO_DAY_FIVE_OVERLAY = {
   ...STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
-  radius: 1.38,
-  feather: 0.46,
-  topStart: 0.52,
+  radius: 2.18,
+  feather: 0.9,
+  topStart: 0.22,
 } as const
 
 const STAGE_TWO_DAY_SIX_OVERLAY = {
   ...STAGE_TWO_DAY_FIVE_OVERLAY,
-  radius: 1.52,
-  feather: 0.54,
-  topStart: 0.44,
+  radius: 2.42,
+  feather: 1,
+  topStart: 0.1,
   topEnd: 0.88,
   irregularity: 0.14,
 } as const
@@ -116,8 +116,8 @@ export class TerrainLayer implements LayerController {
       return
     }
 
-    if (stageTwoDay != null && stageTwoDay <= 6) {
-      // 第二阶段第 4-6 天都保留泛绿基调，并在第 6 天继续扩大顶部覆盖范围。
+    if (stageTwoDay != null && stageTwoDay <= 7) {
+      // 第二阶段第 4-7 天都保留泛绿基调，并在第 6 天后的天数继续沿用扩大后的顶部覆盖范围。
       setPlanetGrassOverlay(
         stageTwoDay >= 6
           ? STAGE_TWO_DAY_SIX_OVERLAY

@@ -155,7 +155,7 @@ describe('阶段 1 贴地与遮挡', () => {
     const visiblePatch = grassPatches.find((item) => item.visible)
 
     expect(visiblePatch).toBeDefined()
-    expect(visiblePatch?.scale.y).toBeCloseTo(0.3)
+    expect(visiblePatch?.scale.y).toBeCloseTo(0.525)
     expect((visiblePatch?.scale.y ?? 0)).toBeGreaterThan(0.2)
     expect((visiblePatch?.scale.y ?? 0)).toBeLessThan(sprout.scale.y)
     expect(visiblePatch?.position.length() ?? 0).toBeLessThan(sprout.position.length())
@@ -233,5 +233,62 @@ describe('阶段 1 贴地与遮挡', () => {
       expect(position.distanceTo(trees[1]!.position)).toBeGreaterThan(0.95)
       expect(position.distanceTo(campfirePos)).toBeGreaterThan(1)
     })
+  })
+
+  it('第 7 天延续第 6 天完整样式，并新增矮宽树与更多草簇', async () => {
+    resetPlanetGrassOverlay()
+    const parentGroup = new Group()
+    const grassMesh = new Mesh(
+      new SphereGeometry(3.05, 16, 16),
+      new MeshLambertMaterial({ color: '#6b7045' }),
+    )
+    const terrainLayer = new TerrainLayer({
+      parentGroup,
+      grassMesh,
+      planetRadius: 3,
+    })
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    const daySixInput = {
+      dayCount: 6,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    }
+    const daySevenInput = {
+      dayCount: 7,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    }
+
+    const getVisibleTreeCount = () =>
+      ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
+    const getVisibleGrassPatchCount = () =>
+      ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
+
+    terrainLayer.update(daySixInput)
+    vegetationLayer.update(daySixInput)
+    await vegetationLayer.preload()
+    const daySixOverlay = getPlanetGrassOverlayState()
+    const daySixGrassPatchCount = getVisibleGrassPatchCount()
+
+    terrainLayer.update(daySevenInput)
+    vegetationLayer.update(daySevenInput)
+
+    const daySevenOverlay = getPlanetGrassOverlayState()
+    const trees = (vegetationLayer as any).trees as Group[]
+    const thirdTree = trees[2]
+
+    expect(getVisibleTreeCount()).toBe(3)
+    expect(getVisibleGrassPatchCount()).toBe(daySixGrassPatchCount * 2)
+    expect(getVisibleGrassPatchCount()).toBe(98)
+    expect(daySevenOverlay.radius).toBe(daySixOverlay.radius)
+    expect(daySevenOverlay.topStart).toBe(daySixOverlay.topStart)
+    expect(thirdTree?.visible).toBe(true)
+    expect(thirdTree?.children.length ?? 0).toBeGreaterThan(0)
   })
 })
