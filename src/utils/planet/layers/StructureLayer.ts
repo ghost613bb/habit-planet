@@ -172,7 +172,7 @@ export class StructureLayer implements LayerController {
     const group = new Group()
     const beamGeometry = new CylinderGeometry(0.025, 0.025, 0.72, 6)
 
-    const corners = [
+    const corners: Array<[number, number, number]> = [
       [-0.28, 0.36, -0.2],
       [0.28, 0.36, -0.2],
       [-0.28, 0.36, 0.2],

@@ -1,6 +1,7 @@
 import {
   Group,
   Mesh,
+  MeshStandardMaterial,
   PointLight,
   RingGeometry,
   Vector3,
@@ -67,23 +68,35 @@ export class FxLayer implements LayerController {
     this.campfireLight.visible = input.stageIndex >= 2
     this.campfireLight.intensity = input.stageIndex >= 2 ? 0.9 + input.stageProgress * 0.9 : 0
     this.campfireGlow.visible = input.stageIndex >= 2
-    this.campfireGlow.material.opacity = input.stageIndex >= 2 ? 0.28 + input.stageProgress * 0.16 : 0
+    this.setRingOpacity(
+      this.campfireGlow,
+      input.stageIndex >= 2 ? 0.28 + input.stageProgress * 0.16 : 0,
+    )
 
     this.windowGlow.visible = input.stageIndex >= 4
-    this.windowGlow.material.opacity = input.stageIndex >= 4 ? 0.2 + input.stageProgress * 0.25 : 0
+    this.setRingOpacity(
+      this.windowGlow,
+      input.stageIndex >= 4 ? 0.2 + input.stageProgress * 0.25 : 0,
+    )
 
     this.orbitRing.visible = input.stageIndex >= 4
     this.orbitRingOuter.visible = input.stageIndex >= 5
-    this.orbitRing.material.opacity = input.stageIndex >= 4
-      ? input.qualityTier === 'tier-0'
-        ? 0.18
-        : 0.3
-      : 0
-    this.orbitRingOuter.material.opacity = input.stageIndex >= 5
-      ? input.qualityTier === 'tier-0'
-        ? 0.12
-        : 0.24
-      : 0
+    this.setRingOpacity(
+      this.orbitRing,
+      input.stageIndex >= 4
+        ? input.qualityTier === 'tier-0'
+          ? 0.18
+          : 0.3
+        : 0,
+    )
+    this.setRingOpacity(
+      this.orbitRingOuter,
+      input.stageIndex >= 5
+        ? input.qualityTier === 'tier-0'
+          ? 0.12
+          : 0.24
+        : 0,
+    )
     this.orbitRing.rotation.z = input.dayCount * 0.02
     this.orbitRingOuter.rotation.z = -input.dayCount * 0.015
   }
@@ -94,6 +107,13 @@ export class FxLayer implements LayerController {
 
   dispose() {
     this.parentGroup.remove(this.group)
+  }
+
+  private setRingOpacity(mesh: Mesh, opacity: number) {
+    const material = mesh.material
+    if (Array.isArray(material)) return
+    if (!(material instanceof MeshStandardMaterial)) return
+    material.opacity = opacity
   }
 
   private setupTransforms() {
