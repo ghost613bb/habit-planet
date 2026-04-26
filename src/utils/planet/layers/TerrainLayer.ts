@@ -116,14 +116,17 @@ export class TerrainLayer implements LayerController {
       return
     }
 
-    if (stageTwoDay != null && stageTwoDay <= 7) {
-      // 第二阶段第 4-7 天都保留泛绿基调，并在第 6 天后的天数继续沿用扩大后的顶部覆盖范围。
+    if (input.stageIndex >= 2) {
+      // 从第 4 天开始，顶部泛绿按逐日累积逻辑持续保留；
+      // 第 8 天及后续阶段若没有新的覆盖配置，默认继承第 7 天已经形成的范围。
       setPlanetGrassOverlay(
-        stageTwoDay >= 6
+        stageTwoDay == null
           ? STAGE_TWO_DAY_SIX_OVERLAY
-          : stageTwoDay === 5
-            ? STAGE_TWO_DAY_FIVE_OVERLAY
-            : STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
+          : stageTwoDay >= 6
+            ? STAGE_TWO_DAY_SIX_OVERLAY
+            : stageTwoDay === 5
+              ? STAGE_TWO_DAY_FIVE_OVERLAY
+              : STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
       )
     } else {
       resetPlanetGrassOverlay()

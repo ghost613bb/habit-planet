@@ -291,4 +291,46 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(thirdTree?.visible).toBe(true)
     expect(thirdTree?.children.length ?? 0).toBeGreaterThan(0)
   })
+
+  it('第 8 天及后续阶段默认延续第 7 天顶部泛绿，不会被主动清空', () => {
+    resetPlanetGrassOverlay()
+    const parentGroup = new Group()
+    const grassMesh = new Mesh(
+      new SphereGeometry(3.05, 16, 16),
+      new MeshLambertMaterial({ color: '#6b7045' }),
+    )
+    const terrainLayer = new TerrainLayer({
+      parentGroup,
+      grassMesh,
+      planetRadius: 3,
+    })
+
+    terrainLayer.update({
+      dayCount: 7,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const daySevenOverlay = getPlanetGrassOverlayState()
+
+    terrainLayer.update({
+      dayCount: 8,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const dayEightOverlay = getPlanetGrassOverlayState()
+
+    terrainLayer.update({
+      dayCount: 11,
+      stageIndex: 3 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+    const stageThreeOverlay = getPlanetGrassOverlayState()
+
+    expect(dayEightOverlay).toEqual(daySevenOverlay)
+    expect(stageThreeOverlay).toEqual(daySevenOverlay)
+    expect(stageThreeOverlay.strength).toBeGreaterThan(0)
+  })
 })
