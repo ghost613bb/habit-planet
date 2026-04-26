@@ -9,6 +9,7 @@ import {
 } from 'three'
 
 import { mats, resetPlanetGrassOverlay, setPlanetGrassOverlay } from '../assets/Materials'
+import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
@@ -26,29 +27,6 @@ const STAGE_ONE_DAY_THREE_OVERLAY = {
   topEnd: 0.9,
   irregularity: 0.1,
   color: '#4b8534',
-} as const
-
-const STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY = {
-  ...STAGE_ONE_DAY_THREE_OVERLAY,
-  radius: 1.98,
-  feather: 0.82,
-  topStart: 0.28,
-} as const
-
-const STAGE_TWO_DAY_FIVE_OVERLAY = {
-  ...STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
-  radius: 2.18,
-  feather: 0.9,
-  topStart: 0.22,
-} as const
-
-const STAGE_TWO_DAY_SIX_OVERLAY = {
-  ...STAGE_TWO_DAY_FIVE_OVERLAY,
-  radius: 2.42,
-  feather: 1,
-  topStart: 0.1,
-  topEnd: 0.88,
-  irregularity: 0.14,
 } as const
 
 export class TerrainLayer implements LayerController {
@@ -91,7 +69,8 @@ export class TerrainLayer implements LayerController {
   update(input: LayerUpdateInput) {
     const grassMaterial = this.grassMesh.material as MeshLambertMaterial
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
-    const stageTwoDay = input.stageIndex === 2 ? Math.max(4, Math.floor(input.dayCount)) : null
+    const stageTwoTerrainTuning =
+      input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).terrain : null
     const scaleByStage = {
       1: 0.2 + input.stageProgress * 0.25,
       2: 0.48 + input.stageProgress * 0.18,
@@ -117,17 +96,8 @@ export class TerrainLayer implements LayerController {
     }
 
     if (input.stageIndex >= 2) {
-      // 从第 4 天开始，顶部泛绿按逐日累积逻辑持续保留；
-      // 第 8 天及后续阶段若没有新的覆盖配置，默认继承第 7 天已经形成的范围。
-      setPlanetGrassOverlay(
-        stageTwoDay == null
-          ? STAGE_TWO_DAY_SIX_OVERLAY
-          : stageTwoDay >= 6
-            ? STAGE_TWO_DAY_SIX_OVERLAY
-            : stageTwoDay === 5
-              ? STAGE_TWO_DAY_FIVE_OVERLAY
-              : STAGE_TWO_DAY_FOUR_TO_FIVE_OVERLAY,
-      )
+      // 第二阶段的顶部泛绿完全由逐日调优表驱动；后续阶段默认继承第二阶段最后一天的结果。
+      setPlanetGrassOverlay((stageTwoTerrainTuning ?? getStageTwoDayTuning(10).terrain).grassOverlay)
     } else {
       resetPlanetGrassOverlay()
     }
@@ -138,8 +108,8 @@ export class TerrainLayer implements LayerController {
     )
 
     this.rocks.visible = input.stageIndex <= 2
-    if (stageTwoDay != null) {
-      this.rocks.count = stageTwoDay === 4 ? 5 : stageTwoDay === 5 ? 6 : 7
+    if (stageTwoTerrainTuning != null) {
+      this.rocks.count = stageTwoTerrainTuning.rockCount
       return
     }
 

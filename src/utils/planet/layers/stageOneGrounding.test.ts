@@ -2,6 +2,7 @@ import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry, Vector3 } f
 import { describe, expect, it } from 'vitest'
 
 import { getPlanetGrassOverlayState, mats, resetPlanetGrassOverlay } from '../assets/Materials'
+import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA } from './campfirePlacement'
 import {
   getPlacementTransform,
@@ -234,7 +235,7 @@ describe('阶段 1 贴地与遮挡', () => {
     })
   })
 
-  it('第 7 天延续第 6 天递进样式，并新增第 2 棵树与更多草簇', async () => {
+  it('第 7 天继续按逐日调优表递进，并新增第 2 棵树与更多草簇', async () => {
     resetPlanetGrassOverlay()
     const parentGroup = new Group()
     const grassMesh = new Mesh(
@@ -286,14 +287,15 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(getVisibleTreeCount()).toBe(2)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(daySixGrassPatchCount)
     expect(getVisibleGrassPatchCount()).toBe(58)
-    expect(daySevenOverlay.radius).toBe(daySixOverlay.radius)
-    expect(daySevenOverlay.topStart).toBe(daySixOverlay.topStart)
+    expect(daySevenOverlay).toEqual(getStageTwoDayTuning(7).terrain.grassOverlay)
+    expect(daySevenOverlay.radius).toBeGreaterThan(daySixOverlay.radius)
+    expect(daySevenOverlay.topStart).toBeLessThan(daySixOverlay.topStart)
     expect(secondTree?.visible).toBe(true)
     expect(secondTree?.children.length ?? 0).toBeGreaterThan(0)
     expect(thirdTree?.visible).toBe(false)
   })
 
-  it('第 8 天及后续阶段默认延续第 7 天顶部泛绿，不会被主动清空', () => {
+  it('第 8-10 天继续按逐日调优表扩张，后续阶段默认继承第 10 天顶部泛绿', () => {
     resetPlanetGrassOverlay()
     const parentGroup = new Group()
     const grassMesh = new Mesh(
@@ -323,6 +325,14 @@ describe('阶段 1 贴地与遮挡', () => {
     const dayEightOverlay = getPlanetGrassOverlayState()
 
     terrainLayer.update({
+      dayCount: 10,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const dayTenOverlay = getPlanetGrassOverlayState()
+
+    terrainLayer.update({
       dayCount: 11,
       stageIndex: 3 as const,
       stageProgress: 0,
@@ -330,8 +340,12 @@ describe('阶段 1 贴地与遮挡', () => {
     })
     const stageThreeOverlay = getPlanetGrassOverlayState()
 
-    expect(dayEightOverlay).toEqual(daySevenOverlay)
-    expect(stageThreeOverlay).toEqual(daySevenOverlay)
+    expect(daySevenOverlay).toEqual(getStageTwoDayTuning(7).terrain.grassOverlay)
+    expect(dayEightOverlay).toEqual(getStageTwoDayTuning(8).terrain.grassOverlay)
+    expect(dayTenOverlay).toEqual(getStageTwoDayTuning(10).terrain.grassOverlay)
+    expect(dayEightOverlay.radius).toBeGreaterThan(daySevenOverlay.radius)
+    expect(dayTenOverlay.radius).toBeGreaterThan(dayEightOverlay.radius)
+    expect(stageThreeOverlay).toEqual(dayTenOverlay)
     expect(stageThreeOverlay.strength).toBeGreaterThan(0)
   })
 })

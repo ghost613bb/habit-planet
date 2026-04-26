@@ -27,7 +27,7 @@ describe('第二阶段逐日配置', () => {
 })
 
 describe('阶段 2 早期植被', () => {
-  it('第 4-5 天使用比第一阶段更大的顶部泛绿范围，且第 5 天比第 4 天继续扩大', () => {
+  it('第 4-5 天顶部泛绿按逐日调优表查值，且比第一阶段继续外扩', () => {
     resetPlanetGrassOverlay()
     const parentGroup = new Group()
     const grassMesh = new Mesh(
@@ -63,6 +63,8 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
     const stageTwoDayFiveOverlay = getPlanetGrassOverlayState()
+    const dayFourTerrainTuning = getStageTwoDayTuning(4).terrain
+    const dayFiveTerrainTuning = getStageTwoDayTuning(5).terrain
 
     expect(stageOneDayThreeOverlay).toEqual({
       strength: 0.9,
@@ -73,24 +75,8 @@ describe('阶段 2 早期植被', () => {
       irregularity: 0.1,
       color: '#4b8534',
     })
-    expect(stageTwoDayFourOverlay).toEqual({
-      strength: 0.9,
-      radius: 1.98,
-      feather: 0.82,
-      topStart: 0.28,
-      topEnd: 0.9,
-      irregularity: 0.1,
-      color: '#4b8534',
-    })
-    expect(stageTwoDayFiveOverlay).toEqual({
-      strength: 0.9,
-      radius: 2.18,
-      feather: 0.9,
-      topStart: 0.22,
-      topEnd: 0.9,
-      irregularity: 0.1,
-      color: '#4b8534',
-    })
+    expect(stageTwoDayFourOverlay).toEqual(dayFourTerrainTuning.grassOverlay)
+    expect(stageTwoDayFiveOverlay).toEqual(dayFiveTerrainTuning.grassOverlay)
     expect(stageTwoDayFourOverlay.radius).toBeGreaterThan(stageOneDayThreeOverlay.radius)
     expect(stageTwoDayFourOverlay.topStart).toBeLessThan(stageOneDayThreeOverlay.topStart)
     expect(stageTwoDayFiveOverlay.radius).toBeGreaterThan(stageTwoDayFourOverlay.radius)
@@ -129,7 +115,7 @@ describe('阶段 2 早期植被', () => {
     expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.505)
   })
 
-  it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
+  it('第 4 天和第 5 天石头数量按逐日调优表查值', () => {
     const parentGroup = new Group()
     const grassMesh = new Mesh(
       new SphereGeometry(3.05, 16, 16),
@@ -149,7 +135,7 @@ describe('阶段 2 早期植被', () => {
     })
 
     const rocks = (terrainLayer as any).rocks as { count: number }
-    expect(rocks.count).toBe(5)
+    expect(rocks.count).toBe(getStageTwoDayTuning(4).terrain.rockCount)
 
     terrainLayer.update({
       dayCount: 5,
@@ -158,7 +144,7 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
 
-    expect(rocks.count).toBe(6)
+    expect(rocks.count).toBe(getStageTwoDayTuning(5).terrain.rockCount)
   })
 
   it('第 4-5 天的草簇都比第一阶段第 3 天铺得更开，且第 5 天继续增密', async () => {
