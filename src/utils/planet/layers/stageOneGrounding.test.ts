@@ -161,7 +161,7 @@ describe('阶段 1 贴地与遮挡', () => {
     expect(visiblePatch?.position.length() ?? 0).toBeLessThan(sprout.position.length())
   })
 
-  it('第 6 天会比第 5 天新增树、增加草簇，并扩大顶部泛绿', () => {
+  it('第 6 天会比第 5 天继续增加灌木和草簇，并扩大顶部泛绿', () => {
     resetPlanetGrassOverlay()
     const parentGroup = new Group()
     const grassMesh = new Mesh(
@@ -212,13 +212,13 @@ describe('阶段 1 贴地与遮挡', () => {
     const daySixOverlay = getPlanetGrassOverlayState()
 
     expect(dayFiveTreeCount).toBe(1)
-    expect(dayFiveBushCount).toBe(5)
-    expect(dayFiveGrassPatchCount).toBe(41)
+    expect(dayFiveBushCount).toBe(3)
+    expect(dayFiveGrassPatchCount).toBe(36)
     expect(getVisibleBushCount()).toBeGreaterThanOrEqual(dayFiveBushCount)
-    expect(getVisibleBushCount()).toBe(5)
-    expect(getVisibleTreeCount()).toBe(2)
+    expect(getVisibleBushCount()).toBe(4)
+    expect(getVisibleTreeCount()).toBe(1)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFiveGrassPatchCount)
-    expect(getVisibleGrassPatchCount()).toBe(49)
+    expect(getVisibleGrassPatchCount()).toBe(46)
     expect(daySixOverlay.radius).toBeGreaterThan(dayFiveOverlay.radius)
     expect(daySixOverlay.topStart).toBeLessThan(dayFiveOverlay.topStart)
 
@@ -227,15 +227,14 @@ describe('阶段 1 贴地与遮挡', () => {
       3,
       'default',
     ).pos
-    const extraPatchPositions = grassPatches.slice(41, 49).map((item) => item.position)
+    const extraPatchPositions = grassPatches.slice(dayFiveGrassPatchCount, getVisibleGrassPatchCount()).map((item) => item.position)
     extraPatchPositions.forEach((position) => {
-      expect(position.distanceTo(trees[0]!.position)).toBeGreaterThan(1.05)
-      expect(position.distanceTo(trees[1]!.position)).toBeGreaterThan(0.95)
+      expect(position.distanceTo(trees[0]!.position)).toBeGreaterThan(1)
       expect(position.distanceTo(campfirePos)).toBeGreaterThan(1)
     })
   })
 
-  it('第 7 天延续第 6 天完整样式，并新增矮宽树与更多草簇', async () => {
+  it('第 7 天延续第 6 天递进样式，并新增第 2 棵树与更多草簇', async () => {
     resetPlanetGrassOverlay()
     const parentGroup = new Group()
     const grassMesh = new Mesh(
@@ -281,15 +280,17 @@ describe('阶段 1 贴地与遮挡', () => {
 
     const daySevenOverlay = getPlanetGrassOverlayState()
     const trees = (vegetationLayer as any).trees as Group[]
+    const secondTree = trees[1]
     const thirdTree = trees[2]
 
-    expect(getVisibleTreeCount()).toBe(3)
-    expect(getVisibleGrassPatchCount()).toBe(daySixGrassPatchCount * 2)
-    expect(getVisibleGrassPatchCount()).toBe(98)
+    expect(getVisibleTreeCount()).toBe(2)
+    expect(getVisibleGrassPatchCount()).toBeGreaterThan(daySixGrassPatchCount)
+    expect(getVisibleGrassPatchCount()).toBe(58)
     expect(daySevenOverlay.radius).toBe(daySixOverlay.radius)
     expect(daySevenOverlay.topStart).toBe(daySixOverlay.topStart)
-    expect(thirdTree?.visible).toBe(true)
-    expect(thirdTree?.children.length ?? 0).toBeGreaterThan(0)
+    expect(secondTree?.visible).toBe(true)
+    expect(secondTree?.children.length ?? 0).toBeGreaterThan(0)
+    expect(thirdTree?.visible).toBe(false)
   })
 
   it('第 8 天及后续阶段默认延续第 7 天顶部泛绿，不会被主动清空', () => {

@@ -13,6 +13,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mats } from '../assets/Materials'
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
 import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
+import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
@@ -123,7 +124,7 @@ export class VegetationLayer implements LayerController {
     if (isLegacyStage) return
 
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
-    const stageTwoDay = input.stageIndex === 2 ? Math.max(4, Math.floor(input.dayCount)) : null
+    const stageTwoTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).vegetation : null
 
     this.sprout.visible = input.stageIndex === 1
     if (stageOneDay != null) {
@@ -136,14 +137,14 @@ export class VegetationLayer implements LayerController {
 
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
-    const stageTwoGrassPatchCount =
-      stageTwoDay == null ? 0 : stageTwoDay === 4 ? 32 : stageTwoDay === 5 ? 41 : stageTwoDay === 6 ? 49 : 98
+    const stageTwoGrassPatchCount = stageTwoTuning?.grassPatchCount ?? 0
     const totalVisibleGrassPatchCount =
-      stageTwoDay == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
+      stageTwoTuning == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
     const unifiedGrassPatchScale =
-      (stageOneDay != null && stageOneDay >= 2) || stageTwoDay != null ? 0.3 * GRASS_PATCH_SCALE_BOOST : null
-    const visibleTreeCount =
-      input.stageIndex === 1 ? 0 : stageTwoDay === 4 ? 0 : stageTwoDay === 5 ? 1 : stageTwoDay === 6 ? 2 : 3
+      stageOneDay != null && stageOneDay >= 2
+        ? 0.3 * GRASS_PATCH_SCALE_BOOST
+        : stageTwoTuning?.grassPatchScale ?? null
+    const visibleTreeCount = input.stageIndex === 1 ? 0 : stageTwoTuning?.treeCount ?? 0
 
     if (totalVisibleGrassPatchCount > 0 || visibleTreeCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇或树首次需要显示时懒加载一次。
@@ -162,23 +163,23 @@ export class VegetationLayer implements LayerController {
     const visibleBushCount =
       input.stageIndex === 1
         ? 0
-        : stageTwoDay === 4
-          ? 3
-          : stageTwoDay != null && stageTwoDay >= 5
-            ? 5
-            : 2 + Math.round(input.stageProgress * 2)
+        : stageTwoTuning?.bushCount ?? (2 + Math.round(input.stageProgress * 2))
     for (let i = 0; i < this.bushes.length; i += 1) {
       const bush = this.bushes[i]
       if (!bush) continue
       bush.visible = i < visibleBushCount
-      bush.scale.setScalar((0.75 + input.stageProgress * 0.25) * BUSH_SCALE_BOOST)
+      bush.scale.setScalar(
+        stageTwoTuning != null
+          ? stageTwoTuning.bushScale
+          : (0.75 + input.stageProgress * 0.25) * BUSH_SCALE_BOOST,
+      )
     }
 
     for (let i = 0; i < this.trees.length; i += 1) {
       const tree = this.trees[i]
       if (!tree) continue
       tree.visible = i < visibleTreeCount
-      tree.scale.setScalar(0.7 + input.stageProgress * 0.3)
+      tree.scale.setScalar(stageTwoTuning?.treeScaleSet[i] ?? 0.7 + input.stageProgress * 0.3)
     }
   }
 

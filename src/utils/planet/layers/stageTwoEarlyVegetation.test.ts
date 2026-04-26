@@ -123,10 +123,10 @@ describe('阶段 2 早期植被', () => {
       scale: { x: number }
     }
 
-    expect(visibleBushCount).toBe(3)
+    expect(visibleBushCount).toBe(2)
     expect(visibleTreeCount).toBe(0)
-    expect(visibleGrassPatchCount).toBe(32)
-    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.525)
+    expect(visibleGrassPatchCount).toBe(26)
+    expect(firstVisibleGrassPatch.scale.x).toBeCloseTo(0.505)
   })
 
   it('第 4 天和第 5 天分别显示 5 块和 6 块石头', () => {
@@ -212,13 +212,63 @@ describe('阶段 2 早期植被', () => {
 
     vegetationLayer.update(dayFiveInput)
 
-    expect(getVisibleBushCount()).toBe(5)
+    expect(getVisibleBushCount()).toBe(3)
     expect(getVisibleTreeCount()).toBe(1)
     expect(getFirstVisibleTree()?.children.length ?? 0).toBeGreaterThan(0)
     expect(getVisibleGrassPatchCount()).toBeGreaterThan(dayFourGrassPatchCount)
-    expect(getVisibleGrassPatchCount()).toBe(41)
-    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.525)
+    expect(getVisibleGrassPatchCount()).toBe(36)
+    expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.515)
     expect(dayFourGrassPatchMinNormalizedY).toBeLessThan(stageOneDayThreeGrassPatchMinNormalizedY)
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
+  })
+
+  it('第 7-10 天草簇数量按天增长，第 9 天才出现第 3 棵树', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    const getVisibleTreeCount = () =>
+      ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
+    const getVisibleGrassPatchCount = () =>
+      ((vegetationLayer as any).grassPatches as Object3D[]).filter((item) => item.visible).length
+
+    vegetationLayer.update({
+      dayCount: 7,
+      stageIndex: 2 as const,
+      stageProgress: 0.5,
+      qualityTier: 'tier-1' as const,
+    })
+    await vegetationLayer.preload()
+    expect(getVisibleGrassPatchCount()).toBe(58)
+    expect(getVisibleTreeCount()).toBe(2)
+
+    vegetationLayer.update({
+      dayCount: 8,
+      stageIndex: 2 as const,
+      stageProgress: 0.6,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getVisibleGrassPatchCount()).toBe(70)
+    expect(getVisibleTreeCount()).toBe(2)
+
+    vegetationLayer.update({
+      dayCount: 9,
+      stageIndex: 2 as const,
+      stageProgress: 0.8,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getVisibleGrassPatchCount()).toBe(84)
+    expect(getVisibleTreeCount()).toBe(3)
+
+    vegetationLayer.update({
+      dayCount: 10,
+      stageIndex: 2 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getVisibleGrassPatchCount()).toBe(98)
+    expect(getVisibleTreeCount()).toBe(3)
   })
 })
