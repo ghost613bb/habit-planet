@@ -2,8 +2,29 @@ import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry } from 'thre
 import { describe, expect, it } from 'vitest'
 
 import { getPlanetGrassOverlayState, resetPlanetGrassOverlay } from '../assets/Materials'
+import { getStageTwoDay, getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { TerrainLayer } from './TerrainLayer'
 import { VegetationLayer } from './VegetationLayer'
+
+describe('第二阶段逐日配置', () => {
+  it('会把第 4-10 天映射为固定的逐日配置', () => {
+    expect(getStageTwoDay(4)).toBe(4)
+    expect(getStageTwoDay(8.9)).toBe(8)
+    expect(getStageTwoDay(10)).toBe(10)
+  })
+
+  it('第 8-10 天的草簇和泛绿会继续递进', () => {
+    const dayEight = getStageTwoDayTuning(8)
+    const dayNine = getStageTwoDayTuning(9)
+    const dayTen = getStageTwoDayTuning(10)
+
+    expect(dayEight.vegetation.grassPatchCount).toBe(70)
+    expect(dayNine.vegetation.grassPatchCount).toBe(84)
+    expect(dayTen.vegetation.grassPatchCount).toBe(98)
+    expect(dayEight.terrain.grassOverlay.radius).toBeLessThan(dayNine.terrain.grassOverlay.radius)
+    expect(dayNine.terrain.grassOverlay.radius).toBeLessThan(dayTen.terrain.grassOverlay.radius)
+  })
+})
 
 describe('阶段 2 早期植被', () => {
   it('第 4-5 天使用比第一阶段更大的顶部泛绿范围，且第 5 天比第 4 天继续扩大', () => {
