@@ -13,7 +13,7 @@ describe('第二阶段逐日配置', () => {
     expect(getStageTwoDay(10)).toBe(10)
   })
 
-  it('第 8-10 天的草簇和泛绿会继续递进', () => {
+  it('第 8-10 天的草簇、灌木和泛绿会继续递进', () => {
     const dayEight = getStageTwoDayTuning(8)
     const dayNine = getStageTwoDayTuning(9)
     const dayTen = getStageTwoDayTuning(10)
@@ -21,6 +21,9 @@ describe('第二阶段逐日配置', () => {
     expect(dayEight.vegetation.grassPatchCount).toBe(70)
     expect(dayNine.vegetation.grassPatchCount).toBe(84)
     expect(dayTen.vegetation.grassPatchCount).toBe(98)
+    expect(dayEight.vegetation.bushCount).toBe(4)
+    expect(dayNine.vegetation.bushCount).toBe(4)
+    expect(dayTen.vegetation.bushCount).toBe(4)
     expect(dayEight.terrain.grassOverlay.radius).toBeLessThan(dayNine.terrain.grassOverlay.radius)
     expect(dayNine.terrain.grassOverlay.radius).toBeLessThan(dayTen.terrain.grassOverlay.radius)
   })
@@ -208,13 +211,15 @@ describe('阶段 2 早期植被', () => {
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
   })
 
-  it('第 7-10 天草簇数量按天增长，且第 9-10 天都维持 2 棵树', async () => {
+  it('第 7-10 天草簇数量按天增长，且第 8-10 天都维持 4 个灌木与 2 棵树', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
       planetRadius: 3,
     })
 
+    const getVisibleBushCount = () =>
+      ((vegetationLayer as any).bushes as Object3D[]).filter((item) => item.visible).length
     const getVisibleTreeCount = () =>
       ((vegetationLayer as any).trees as Object3D[]).filter((item) => item.visible).length
     const getVisibleGrassPatchCount = () =>
@@ -228,6 +233,7 @@ describe('阶段 2 早期植被', () => {
     })
     await vegetationLayer.preload()
     expect(getVisibleGrassPatchCount()).toBe(58)
+    expect(getVisibleBushCount()).toBe(4)
     expect(getVisibleTreeCount()).toBe(2)
 
     vegetationLayer.update({
@@ -237,6 +243,7 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(getVisibleGrassPatchCount()).toBe(70)
+    expect(getVisibleBushCount()).toBe(4)
     expect(getVisibleTreeCount()).toBe(2)
 
     vegetationLayer.update({
@@ -246,6 +253,7 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(getVisibleGrassPatchCount()).toBe(84)
+    expect(getVisibleBushCount()).toBe(4)
     expect(getVisibleTreeCount()).toBe(2)
 
     vegetationLayer.update({
@@ -255,6 +263,7 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(getVisibleGrassPatchCount()).toBe(98)
+    expect(getVisibleBushCount()).toBe(4)
     expect(getVisibleTreeCount()).toBe(2)
   })
 })
