@@ -148,7 +148,7 @@ export const STAGE_TWO_DAY_TUNING: Record<StageTwoDay, StageTwoDayTuning> = {
     vegetation: {
       grassPatchCount: 84,
       bushCount: 5,
-      treeCount: 3,
+      treeCount: 2,
       treeScaleSet: [1.04, 0.94, 0.82],
       grassPatchScale: 0.555,
       bushScale: 1.34,
@@ -171,7 +171,7 @@ export const STAGE_TWO_DAY_TUNING: Record<StageTwoDay, StageTwoDayTuning> = {
     vegetation: {
       grassPatchCount: 98,
       bushCount: 5,
-      treeCount: 3,
+      treeCount: 2,
       treeScaleSet: [1.08, 1, 0.9],
       grassPatchScale: 0.565,
       bushScale: 1.36,

@@ -211,7 +211,7 @@ export const STAGE_TWO_DAY_TUNING = {
     vegetation: {
       grassPatchCount: 84,
       bushCount: 5,
-      treeCount: 3,
+      treeCount: 2,
       treeScaleSet: [1.04, 0.94, 0.82],
       grassPatchScale: 0.555,
       bushScale: 1.34,
@@ -234,7 +234,7 @@ export const STAGE_TWO_DAY_TUNING = {
     vegetation: {
       grassPatchCount: 98,
       bushCount: 5,
-      treeCount: 3,
+      treeCount: 2,
       treeScaleSet: [1.08, 1.0, 0.9],
       grassPatchScale: 0.565,
       bushScale: 1.36,
@@ -269,7 +269,7 @@ export const STAGE_TWO_DAY_TUNING = {
 
 - 第二阶段完全改成按天查表。
 - 第 8-10 天草簇继续增加。
-- 第 9 天才出现第 3 棵树。
+- 第 9-10 天维持 2 棵树，通过树冠缩放继续体现成熟度提升。
 - 第 8-10 天即使树数量不变，也能通过 `treeScaleSet` 继续长高和长厚。
 
 ### 实现方案
@@ -294,8 +294,8 @@ const stageTwoTuning = stageTwoDay != null ? getStageTwoDayTuning(stageTwoDay).v
 
 - 第 7 天：`58` 草簇、`4` 灌木、`2` 棵树。
 - 第 8 天：`70` 草簇、`5` 灌木、`2` 棵树，但树冠更成熟。
-- 第 9 天：`84` 草簇、`5` 灌木、`3` 棵树。
-- 第 10 天：`98` 草簇、`5` 灌木、`3` 棵树，树冠达到第二阶段完整状态。
+- 第 9 天：`84` 草簇、`5` 灌木、`2` 棵树，继续提升树冠成熟度。
+- 第 10 天：`98` 草簇、`5` 灌木、`2` 棵树，树冠达到第二阶段完整状态。
 
 ## TerrainLayer 改造方案
 
@@ -339,7 +339,7 @@ const stageTwoTuning = stageTwoDay != null ? getStageTwoDayTuning(stageTwoDay).t
 
 - `VegetationLayer`
   - 验证第 7/8/9/10 天草簇数量分别为 `58/70/84/98`
-  - 验证第 9 天第 3 棵树首次出现
+  - 验证第 9/10 天都保持 `2` 棵树
   - 验证第 8 天树数量不变但树缩放大于第 7 天
 - `TerrainLayer`
   - 验证第 8/9/10 天 `overlay.radius` 递增

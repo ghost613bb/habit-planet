@@ -208,7 +208,7 @@ describe('阶段 2 早期植被', () => {
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
   })
 
-  it('第 7-10 天草簇数量按天增长，第 9 天才出现第 3 棵树', async () => {
+  it('第 7-10 天草簇数量按天增长，且第 9-10 天都维持 2 棵树', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -246,7 +246,7 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(getVisibleGrassPatchCount()).toBe(84)
-    expect(getVisibleTreeCount()).toBe(3)
+    expect(getVisibleTreeCount()).toBe(2)
 
     vegetationLayer.update({
       dayCount: 10,
@@ -255,6 +255,6 @@ describe('阶段 2 早期植被', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(getVisibleGrassPatchCount()).toBe(98)
-    expect(getVisibleTreeCount()).toBe(3)
+    expect(getVisibleTreeCount()).toBe(2)
   })
 })
