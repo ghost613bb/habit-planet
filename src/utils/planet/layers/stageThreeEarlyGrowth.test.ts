@@ -25,6 +25,10 @@ describe('阶段 3 早期（第 11-14 天）', () => {
     await vegetationLayer.preload()
     expect(getVisibleTreeCount()).toBe(3)
     expect(getVisibleFlowerCount()).toBe(1)
+    const dayElevenFlowerBushes = (vegetationLayer as any).flowerBushes as Group[]
+    const visibleDayElevenFlower = dayElevenFlowerBushes.find((item) => item.visible)
+    expect(visibleDayElevenFlower?.children.length ?? 0).toBeGreaterThan(0)
+    expect(visibleDayElevenFlower?.scale.x ?? 0).toBeGreaterThan(0.7)
 
     vegetationLayer.update({
       dayCount: 12,
@@ -73,4 +77,3 @@ describe('阶段 3 早期（第 11-14 天）', () => {
     expect(trees.filter((item) => item.visible).length).toBe(3)
   })
 })
-

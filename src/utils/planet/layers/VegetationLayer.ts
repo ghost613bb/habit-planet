@@ -375,12 +375,13 @@ export class VegetationLayer implements LayerController {
 
   private createFlowerBushAnchors() {
     const anchors = [
-      { phi: 0.24, theta: 0.56, scale: 0.42 },
-      { phi: 0.3, theta: 1.82, scale: 0.45 },
-      { phi: 0.22, theta: 3.05, scale: 0.41 },
-      { phi: 0.28, theta: 4.42, scale: 0.44 },
-      { phi: 0.34, theta: 5.28, scale: 0.43 },
-      { phi: 0.2, theta: 2.28, scale: 0.4 },
+      // 花丛优先摆在 shelter 视角更容易入镜的前半球区域，避免逻辑生效但镜头里看不见。
+      { phi: 0.42, theta: 0.38, scale: 0.78 },
+      { phi: 0.48, theta: 0.92, scale: 0.82 },
+      { phi: 0.45, theta: 1.36, scale: 0.8 },
+      { phi: 0.52, theta: 5.82, scale: 0.84 },
+      { phi: 0.49, theta: 5.38, scale: 0.8 },
+      { phi: 0.56, theta: 0.08, scale: 0.76 },
     ]
 
     return anchors.map((anchor) => {
@@ -449,8 +450,8 @@ export class VegetationLayer implements LayerController {
       flowerBush.clear()
       flowerBush.add(
         createFlowerBushInstance({
-          targetHeight: 0.46,
-          rotationY: index * 0.8,
+          targetHeight: 0.82,
+          rotationY: index * 0.65,
           paletteVariant: paletteVariants[index % paletteVariants.length],
         }),
       )

@@ -27,21 +27,21 @@ let flowerBushLoadPromise: Promise<Group> | null = null
 
 function createLeafClump() {
   const leafMat = new MeshLambertMaterial({ color: new Color(LEAF_COLOR), flatShading: true })
-  const leafGeo = new SphereGeometry(0.12, 7, 6)
+  const leafGeo = new SphereGeometry(0.15, 7, 6)
 
   const leaf1 = new Mesh(leafGeo, leafMat)
-  leaf1.position.set(0.06, 0.1, 0)
-  leaf1.scale.set(1.05, 0.85, 1)
+  leaf1.position.set(0.08, 0.13, 0.01)
+  leaf1.scale.set(1.12, 0.9, 1.02)
   leaf1.userData.flowerBushRole = 'leaf'
 
   const leaf2 = new Mesh(leafGeo, leafMat)
-  leaf2.position.set(-0.05, 0.09, -0.04)
-  leaf2.scale.set(0.95, 0.8, 0.92)
+  leaf2.position.set(-0.08, 0.11, -0.06)
+  leaf2.scale.set(1, 0.86, 0.95)
   leaf2.userData.flowerBushRole = 'leaf'
 
   const leaf3 = new Mesh(leafGeo, leafMat)
-  leaf3.position.set(-0.01, 0.08, 0.06)
-  leaf3.scale.set(0.9, 0.78, 0.95)
+  leaf3.position.set(0.01, 0.1, 0.09)
+  leaf3.scale.set(0.98, 0.82, 0.98)
   leaf3.userData.flowerBushRole = 'leaf'
 
   const root = new Group()
@@ -61,7 +61,7 @@ function createPetalCross(palette: Palette) {
     flatShading: true,
   })
 
-  const plane = new PlaneGeometry(0.14, 0.07, 1, 1)
+  const plane = new PlaneGeometry(0.18, 0.09, 1, 1)
   const p1 = new Mesh(plane, petalMat)
   p1.rotation.y = 0
   p1.userData.flowerBushRole = 'petal'
@@ -75,8 +75,8 @@ function createPetalCross(palette: Palette) {
   p4.rotation.y = -Math.PI / 4
   p4.userData.flowerBushRole = 'petal'
 
-  const center = new Mesh(new SphereGeometry(0.03, 6, 6), centerMat)
-  center.position.y = 0.01
+  const center = new Mesh(new SphereGeometry(0.04, 6, 6), centerMat)
+  center.position.y = 0.015
   center.userData.flowerBushRole = 'center'
 
   group.add(p1, p2, p3, p4, center)
@@ -89,10 +89,10 @@ function createProceduralTemplate() {
 
   // 花朵锚点（局部坐标）；保持确定性，避免测试受随机影响
   const anchors = [
-    { x: 0.08, y: 0.18, z: 0.02, yaw: 0.2, scale: 1 },
-    { x: -0.07, y: 0.17, z: -0.01, yaw: 1.0, scale: 0.92 },
-    { x: -0.01, y: 0.19, z: 0.08, yaw: -0.6, scale: 0.95 },
-    { x: 0.02, y: 0.16, z: -0.08, yaw: 0.5, scale: 0.88 },
+    { x: 0.1, y: 0.24, z: 0.03, yaw: 0.2, scale: 1.08 },
+    { x: -0.09, y: 0.22, z: -0.02, yaw: 1.0, scale: 1 },
+    { x: -0.02, y: 0.25, z: 0.1, yaw: -0.6, scale: 1.04 },
+    { x: 0.03, y: 0.21, z: -0.1, yaw: 0.5, scale: 0.96 },
   ] as const
 
   const baseFlower = createPetalCross(PALETTES.pink)
@@ -137,7 +137,7 @@ export function createFlowerBushInstance(options?: {
   rotationY?: number
   paletteVariant?: FlowerBushPaletteVariant
 }): Group {
-  const targetHeight = options?.targetHeight ?? 0.55
+  const targetHeight = options?.targetHeight ?? 0.72
   const rotationY = options?.rotationY ?? 0
   const paletteVariant = options?.paletteVariant ?? 'pink'
 
@@ -148,4 +148,3 @@ export function createFlowerBushInstance(options?: {
   instance.rotation.y = rotationY
   return instance
 }
-
