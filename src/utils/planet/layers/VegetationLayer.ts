@@ -11,8 +11,14 @@ import {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
+import {
+  createFlowerBushInstance,
+  preloadFlowerBushTemplate,
+  type FlowerBushPaletteVariant,
+} from '../assets/FlowerBush'
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
 import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
+import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
@@ -38,11 +44,13 @@ export class VegetationLayer implements LayerController {
   private bushes: Group[] = []
   private trees: Group[] = []
   private grassPatches: Group[] = []
+  private flowerBushes: Group[] = []
   private grassPatchTemplate: Group | null = null
   private grassPatchLoader = new GLTFLoader(new LoadingManager())
   private grassPatchLoadPromise: Promise<void> | null = null
   private leafyTreeLoadPromise: Promise<void> | null = null
   private lowPolyWideTreeLoadPromise: Promise<void> | null = null
+  private flowerBushLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -62,6 +70,9 @@ export class VegetationLayer implements LayerController {
 
     this.grassPatches = this.createGrassPatchAnchors()
     this.grassPatches.forEach((item) => this.group.add(item))
+
+    this.flowerBushes = this.createFlowerBushAnchors()
+    this.flowerBushes.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
@@ -106,10 +117,17 @@ export class VegetationLayer implements LayerController {
       })
     }
 
+    if (!this.flowerBushLoadPromise) {
+      this.flowerBushLoadPromise = preloadFlowerBushTemplate().then(() => {
+        this.attachFlowerBushInstances()
+      })
+    }
+
     return Promise.all([
       this.grassPatchLoadPromise,
       this.leafyTreeLoadPromise,
       this.lowPolyWideTreeLoadPromise,
+      this.flowerBushLoadPromise,
     ]).then(() => undefined)
   }
 
@@ -118,13 +136,16 @@ export class VegetationLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
-    const isLegacyStage = input.stageIndex >= 3
+    const isLegacyStage = input.stageIndex >= 4
     this.group.visible = !isLegacyStage
 
     if (isLegacyStage) return
 
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).vegetation : null
+    const stageThreeTuning = input.stageIndex === 3 ? getStageThreeDayTuning(input.dayCount) : null
+    const persistedStageTwoTuning = stageThreeTuning != null ? getStageTwoDayTuning(10).vegetation : null
+    const inheritedVegetationTuning = stageTwoTuning ?? persistedStageTwoTuning
 
     this.sprout.visible = input.stageIndex === 1
     if (stageOneDay != null) {
@@ -137,16 +158,18 @@ export class VegetationLayer implements LayerController {
 
     const stageOneGrassPatchCount =
       stageOneDay == null ? 0 : stageOneDay === 1 ? 0 : stageOneDay === 2 ? 8 : 16
-    const stageTwoGrassPatchCount = stageTwoTuning?.grassPatchCount ?? 0
+    const stageTwoGrassPatchCount = inheritedVegetationTuning?.grassPatchCount ?? 0
     const totalVisibleGrassPatchCount =
-      stageTwoTuning == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
+      inheritedVegetationTuning == null ? stageOneGrassPatchCount : stageTwoGrassPatchCount
     const unifiedGrassPatchScale =
       stageOneDay != null && stageOneDay >= 2
         ? 0.3 * GRASS_PATCH_SCALE_BOOST
-        : stageTwoTuning?.grassPatchScale ?? null
-    const visibleTreeCount = input.stageIndex === 1 ? 0 : stageTwoTuning?.treeCount ?? 0
+        : inheritedVegetationTuning?.grassPatchScale ?? null
+    const visibleTreeCount =
+      input.stageIndex === 1 ? 0 : stageThreeTuning != null ? 3 : inheritedVegetationTuning?.treeCount ?? 0
+    const visibleFlowerBushCount = stageThreeTuning?.flowerBushCount ?? 0
 
-    if (totalVisibleGrassPatchCount > 0 || visibleTreeCount > 0) {
+    if (totalVisibleGrassPatchCount > 0 || visibleTreeCount > 0 || visibleFlowerBushCount > 0) {
       // 真实运行链路不会手动调用 preload，这里在草簇或树首次需要显示时懒加载一次。
       void this.preload()
     }
@@ -163,14 +186,14 @@ export class VegetationLayer implements LayerController {
     const visibleBushCount =
       input.stageIndex === 1
         ? 0
-        : stageTwoTuning?.bushCount ?? (2 + Math.round(input.stageProgress * 2))
+        : inheritedVegetationTuning?.bushCount ?? (2 + Math.round(input.stageProgress * 2))
     for (let i = 0; i < this.bushes.length; i += 1) {
       const bush = this.bushes[i]
       if (!bush) continue
       bush.visible = i < visibleBushCount
       bush.scale.setScalar(
-        stageTwoTuning != null
-          ? stageTwoTuning.bushScale
+        inheritedVegetationTuning != null
+          ? inheritedVegetationTuning.bushScale
           : (0.75 + input.stageProgress * 0.25) * BUSH_SCALE_BOOST,
       )
     }
@@ -179,7 +202,18 @@ export class VegetationLayer implements LayerController {
       const tree = this.trees[i]
       if (!tree) continue
       tree.visible = i < visibleTreeCount
-      tree.scale.setScalar(stageTwoTuning?.treeScaleSet[i] ?? 0.7 + input.stageProgress * 0.3)
+      if (stageThreeTuning != null) {
+        const baseTreeScale = persistedStageTwoTuning?.treeScaleSet[i] ?? 1
+        tree.scale.setScalar(i === 2 ? stageThreeTuning.thirdTreeScale : baseTreeScale)
+        continue
+      }
+      tree.scale.setScalar(inheritedVegetationTuning?.treeScaleSet[i] ?? 0.7 + input.stageProgress * 0.3)
+    }
+
+    for (let i = 0; i < this.flowerBushes.length; i += 1) {
+      const flowerBush = this.flowerBushes[i]
+      if (!flowerBush) continue
+      flowerBush.visible = i < visibleFlowerBushCount
     }
   }
 
@@ -187,6 +221,9 @@ export class VegetationLayer implements LayerController {
     this.group.visible = false
     this.grassPatches.forEach((patch) => {
       patch.visible = false
+    })
+    this.flowerBushes.forEach((flowerBush) => {
+      flowerBush.visible = false
     })
   }
 
@@ -336,6 +373,33 @@ export class VegetationLayer implements LayerController {
     })
   }
 
+  private createFlowerBushAnchors() {
+    const anchors = [
+      { phi: 0.24, theta: 0.56, scale: 0.42 },
+      { phi: 0.3, theta: 1.82, scale: 0.45 },
+      { phi: 0.22, theta: 3.05, scale: 0.41 },
+      { phi: 0.28, theta: 4.42, scale: 0.44 },
+      { phi: 0.34, theta: 5.28, scale: 0.43 },
+      { phi: 0.2, theta: 2.28, scale: 0.4 },
+    ]
+
+    return anchors.map((anchor) => {
+      const flowerBush = new Group()
+      const { pos, quaternion } = getPlacementTransform(
+        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+        this.planetRadius,
+        'bush',
+      )
+
+      flowerBush.position.copy(pos)
+      flowerBush.quaternion.copy(quaternion)
+      flowerBush.scale.setScalar(anchor.scale)
+      flowerBush.visible = false
+
+      return flowerBush
+    })
+  }
+
   private attachGrassPatchInstances() {
     this.grassPatches.forEach((patch, index) => {
       patch.clear()
@@ -373,6 +437,21 @@ export class VegetationLayer implements LayerController {
         createLeafyTreeInstance({
           targetHeight: (index === 0 ? 0.82 : 0.7) * LEAFY_TREE_SCALE_BOOST,
           rotationY: index * 0.9,
+        }),
+      )
+    })
+  }
+
+  private attachFlowerBushInstances() {
+    const paletteVariants: FlowerBushPaletteVariant[] = ['pink', 'yellow', 'blue']
+
+    this.flowerBushes.forEach((flowerBush, index) => {
+      flowerBush.clear()
+      flowerBush.add(
+        createFlowerBushInstance({
+          targetHeight: 0.46,
+          rotationY: index * 0.8,
+          paletteVariant: paletteVariants[index % paletteVariants.length],
         }),
       )
     })
