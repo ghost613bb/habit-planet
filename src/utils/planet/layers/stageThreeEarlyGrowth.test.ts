@@ -28,7 +28,8 @@ describe('阶段 3 早期（第 11-14 天）', () => {
     const dayElevenFlowerBushes = (vegetationLayer as any).flowerBushes as Group[]
     const visibleDayElevenFlower = dayElevenFlowerBushes.find((item) => item.visible)
     expect(visibleDayElevenFlower?.children.length ?? 0).toBeGreaterThan(0)
-    expect(visibleDayElevenFlower?.scale.x ?? 0).toBeGreaterThan(0.7)
+    const flowerInstance = visibleDayElevenFlower?.children[0] as Object3D | undefined
+    expect(flowerInstance?.scale.x ?? 0).toBeGreaterThan(1)
 
     vegetationLayer.update({
       dayCount: 12,

@@ -23,6 +23,13 @@ describe('FlowerBush', () => {
     expect(template.children.length).toBeGreaterThan(0)
   })
 
+  it('单个花丛模板包含 5 朵花', async () => {
+    await preloadFlowerBushTemplate()
+    const flowerBush = createFlowerBushInstance({ targetHeight: 0.6, paletteVariant: 'pink' })
+    const centers = collectRoleColors(flowerBush, 'center')
+    expect(centers.length).toBe(5)
+  })
+
   it('createFlowerBushInstance 可按 targetHeight 缩放', async () => {
     await preloadFlowerBushTemplate()
     const a = createFlowerBushInstance({ targetHeight: 0.4, paletteVariant: 'pink' })
@@ -62,4 +69,3 @@ describe('FlowerBush', () => {
     expect(blueLeaves.join(',')).toBe(pinkLeaves.join(','))
   })
 })
-

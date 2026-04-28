@@ -375,13 +375,14 @@ export class VegetationLayer implements LayerController {
 
   private createFlowerBushAnchors() {
     const anchors = [
-      // 花丛优先摆在 shelter 视角更容易入镜的前半球区域，避免逻辑生效但镜头里看不见。
-      { phi: 0.42, theta: 0.38, scale: 0.78 },
-      { phi: 0.48, theta: 0.92, scale: 0.82 },
-      { phi: 0.45, theta: 1.36, scale: 0.8 },
-      { phi: 0.52, theta: 5.82, scale: 0.84 },
-      { phi: 0.49, theta: 5.38, scale: 0.8 },
-      { phi: 0.56, theta: 0.08, scale: 0.76 },
+      // 这些点位避开了篝火(theta≈0.92)、草球(≈1.02/1.46/2.4/3.6/5.1)和主树(≈5.72/2.62/2.7/4.8)。
+      // 同时仍尽量落在 shelter 视角前半球，保证第 11-14 天更容易看到。
+      { phi: 0.64, theta: 0.16, scale: 0.92 },
+      { phi: 0.6, theta: 1.84, scale: 0.96 },
+      { phi: 0.58, theta: 3.18, scale: 0.94 },
+      { phi: 0.66, theta: 4.22, scale: 0.98 },
+      { phi: 0.62, theta: 5.94, scale: 0.95 },
+      { phi: 0.68, theta: 0.58, scale: 0.9 },
     ]
 
     return anchors.map((anchor) => {
@@ -450,8 +451,8 @@ export class VegetationLayer implements LayerController {
       flowerBush.clear()
       flowerBush.add(
         createFlowerBushInstance({
-          targetHeight: 0.82,
-          rotationY: index * 0.65,
+          targetHeight: 1.02,
+          rotationY: index * 0.72,
           paletteVariant: paletteVariants[index % paletteVariants.length],
         }),
       )
