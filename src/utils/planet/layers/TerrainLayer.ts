@@ -19,16 +19,6 @@ type TerrainLayerOptions = {
   planetRadius: number
 }
 
-const STAGE_ONE_DAY_THREE_OVERLAY = {
-  strength: 0.9,
-  radius: 1.52,
-  feather: 0.56,
-  topStart: 0.5,
-  topEnd: 0.9,
-  irregularity: 0.1,
-  color: '#4b8534',
-} as const
-
 export class TerrainLayer implements LayerController {
   id = 'terrain'
 
@@ -69,8 +59,8 @@ export class TerrainLayer implements LayerController {
   update(input: LayerUpdateInput) {
     const grassMaterial = this.grassMesh.material as MeshLambertMaterial
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
-    const stageTwoTerrainTuning =
-      input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).terrain : null
+    const stageTwoTerrainTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).terrain : null
+    const inheritedTerrainTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).terrain : null
     const scaleByStage = {
       1: 0.2 + input.stageProgress * 0.25,
       2: 0.48 + input.stageProgress * 0.18,
@@ -85,7 +75,15 @@ export class TerrainLayer implements LayerController {
       // 第 1 天只出现幼苗；第 3 天才让顶部轻微泛绿，模拟草被刚长出来。
       this.grassMesh.visible = false
       if (stageOneDay >= 3) {
-        setPlanetGrassOverlay(STAGE_ONE_DAY_THREE_OVERLAY)
+        setPlanetGrassOverlay({
+          strength: 0.9,
+          radius: 1.52,
+          feather: 0.56,
+          topStart: 0.5,
+          topEnd: 0.9,
+          irregularity: 0.1,
+          color: '#4b8534',
+        })
       } else {
         resetPlanetGrassOverlay()
       }
@@ -95,25 +93,22 @@ export class TerrainLayer implements LayerController {
       return
     }
 
-    if (input.stageIndex >= 2) {
-      // 第二阶段的顶部泛绿完全由逐日调优表驱动；后续阶段默认继承第二阶段最后一天的结果。
-      setPlanetGrassOverlay((stageTwoTerrainTuning ?? getStageTwoDayTuning(10).terrain).grassOverlay)
+    if (stageTwoTerrainTuning != null) {
+      setPlanetGrassOverlay(stageTwoTerrainTuning.grassOverlay)
+    } else if (inheritedTerrainTuning != null) {
+      setPlanetGrassOverlay(inheritedTerrainTuning.grassOverlay)
     } else {
       resetPlanetGrassOverlay()
     }
     this.grassMesh.visible = input.stageIndex >= 1
     this.grassMesh.scale.set(nextScale, nextScale, nextScale)
     grassMaterial.color.set(
-      input.stageIndex >= 5 ? '#86a95d' : input.stageIndex >= 3 ? '#7e9460' : '#6b7045',
+      stageTwoTerrainTuning?.groundTint ??
+        (input.stageIndex >= 5 ? '#86a95d' : input.stageIndex >= 3 ? '#7e9460' : '#6b7045'),
     )
 
     this.rocks.visible = input.stageIndex <= 2
-    if (stageTwoTerrainTuning != null) {
-      this.rocks.count = stageTwoTerrainTuning.rockCount
-      return
-    }
-
-    this.rocks.count = input.stageIndex === 2 ? 8 : 0
+    this.rocks.count = input.stageIndex === 2 ? stageTwoTerrainTuning?.rockCount ?? 8 : 0
   }
 
   deactivate() {
