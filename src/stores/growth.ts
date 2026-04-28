@@ -96,7 +96,7 @@ export const growthStages: GrowthStage[] = [
     id: 'shelter',
     name: '家园雏形',
     threshold: 11,
-    description: '土路与木屋骨架出现',
+    description: '第三棵树与花丛出现',
     vegetation: { grass: 220, flowers: 24, bushes: 18, trees: 4 },
   },
   {

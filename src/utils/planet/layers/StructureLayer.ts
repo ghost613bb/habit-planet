@@ -35,7 +35,6 @@ export class StructureLayer implements LayerController {
   private campfireTemplate: Group | null = null
   private campfireLoader = new GLTFLoader(new LoadingManager())
   private campfireLoadPromise: Promise<void> | null = null
-  private hutSkeleton: Group
   private hutFull: Group
   private windmill: Group
   private windmillRotor: Group
@@ -49,7 +48,6 @@ export class StructureLayer implements LayerController {
     this.parentGroup.add(this.group)
 
     this.campfire = this.createCampfire()
-    this.hutSkeleton = this.createHutSkeleton()
     this.hutFull = this.createHutFull()
     this.windmill = this.createWindmill()
     this.windmillRotor = this.windmill.children[1] as Group
@@ -58,7 +56,6 @@ export class StructureLayer implements LayerController {
 
     this.group.add(
       this.campfire,
-      this.hutSkeleton,
       this.hutFull,
       this.windmill,
       this.bench,
@@ -114,7 +111,6 @@ export class StructureLayer implements LayerController {
     }
 
     this.campfire.visible = input.stageIndex >= 2
-    this.hutSkeleton.visible = input.stageIndex === 3
     this.hutFull.visible = input.stageIndex >= 4
     this.windmill.visible = input.stageIndex >= 4
     this.bench.visible = input.stageIndex >= 5
@@ -122,7 +118,6 @@ export class StructureLayer implements LayerController {
 
     this.campfire.scale.setScalar(input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1)
     this.windmillRotor.rotation.z = input.stageIndex >= 4 ? input.dayCount * 0.12 : 0
-    this.hutSkeleton.scale.setScalar(input.stageIndex === 3 ? 0.8 + input.stageProgress * 0.2 : 1)
     this.hutFull.scale.setScalar(input.stageIndex >= 4 ? 0.95 + input.stageProgress * 0.05 : 1)
     this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
     this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
@@ -166,44 +161,6 @@ export class StructureLayer implements LayerController {
     instance.rotation.y = CAMPFIRE_MODEL_YAW
 
     this.campfire.add(instance)
-  }
-
-  private createHutSkeleton() {
-    const group = new Group()
-    const beamGeometry = new CylinderGeometry(0.025, 0.025, 0.72, 6)
-
-    const corners: Array<[number, number, number]> = [
-      [-0.28, 0.36, -0.2],
-      [0.28, 0.36, -0.2],
-      [-0.28, 0.36, 0.2],
-      [0.28, 0.36, 0.2],
-    ]
-
-    corners.forEach(([x, y, z]) => {
-      const beam = new Mesh(beamGeometry, mats.trunk)
-      beam.position.set(x, y, z)
-      group.add(beam)
-    })
-
-    const roofLeft = new Mesh(new CylinderGeometry(0.02, 0.02, 0.78, 6), mats.trunk)
-    roofLeft.position.set(-0.16, 0.78, 0)
-    roofLeft.rotation.z = Math.PI / 4
-    group.add(roofLeft)
-
-    const roofRight = new Mesh(new CylinderGeometry(0.02, 0.02, 0.78, 6), mats.trunk)
-    roofRight.position.set(0.16, 0.78, 0)
-    roofRight.rotation.z = -Math.PI / 4
-    group.add(roofRight)
-
-    const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.2, 2.1),
-      this.planetRadius + 0.02,
-    )
-    group.position.copy(pos)
-    group.quaternion.copy(quaternion)
-    group.visible = false
-
-    return group
   }
 
   private createHutFull() {

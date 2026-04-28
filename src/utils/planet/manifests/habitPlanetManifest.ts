@@ -26,7 +26,7 @@ export const habitPlanetManifest: HabitPlanetManifest = {
     3: {
       cameraPreset: 'shelter',
       layers: ['terrain', 'vegetation', 'structure'],
-      heroIds: ['hut-skeleton'],
+      heroIds: [],
     },
     4: {
       cameraPreset: 'home',
@@ -47,7 +47,6 @@ export const habitPlanetManifest: HabitPlanetManifest = {
   assets: [
     { id: 'sprout', scope: 'hero', stages: [1], preloadAt: [1], source: 'existing-reuse', degradeTo: null },
     { id: 'campfire', scope: 'hero', stages: [2], preloadAt: [2], source: 'required-model', degradeTo: null },
-    { id: 'hut-skeleton', scope: 'hero', stages: [3], preloadAt: [2, 3], source: 'procedural-kitbash', degradeTo: null },
     { id: 'hut-full', scope: 'hero', stages: [4, 5, 6], preloadAt: [3, 4], source: 'required-model', degradeTo: 'hut-basic' },
     { id: 'windmill', scope: 'hero', stages: [4, 5, 6], preloadAt: [4], source: 'required-model', degradeTo: 'windmill-static' },
     { id: 'rabbit', scope: 'hero', stages: [4, 5], preloadAt: [4], source: 'required-model', degradeTo: 'rabbit-static' },

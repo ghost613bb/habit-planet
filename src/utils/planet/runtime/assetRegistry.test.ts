@@ -7,7 +7,9 @@ describe('assetRegistry', () => {
   it('collects current and next-stage hero assets', () => {
     const registry = createAssetRegistry(habitPlanetManifest.assets)
     expect(registry.getStageAssets(2).heroIds).toContain('campfire')
-    expect(registry.getPreloadAssets(2)).toContain('hut-skeleton')
+    expect(registry.getPreloadAssets(2)).toContain('hut-full')
+    expect(registry.getPreloadAssets(2)).not.toContain('hut-skeleton')
+    expect(registry.getStageAssets(3).heroIds).toEqual([])
   })
 
   it('returns releasable optional fx when quality drops', () => {
