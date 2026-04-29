@@ -150,6 +150,46 @@ function onQualityTierChange(qualityTier: 'tier-0' | 'tier-1' | 'tier-2') {
   debugStore.setQualityTier(qualityTier)
 }
 
+function applyPreviewDayFromUrl() {
+  const url = new URL(window.location.href)
+  const rawDay = url.searchParams.get('day')
+  // #region debug-point E:preview-day-param
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    body: JSON.stringify({
+      sessionId: 'path-not-visible',
+      runId: 'pre-fix',
+      hypothesisId: 'E',
+      location: 'DemoHome.vue:applyPreviewDayFromUrl',
+      msg: '[DEBUG] 读取预览 day 参数',
+      data: { href: window.location.href, rawDay },
+      ts: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+  if (!rawDay) return
+
+  const nextDayCount = Number.parseInt(rawDay, 10)
+  // #region debug-point E:preview-day-apply
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    body: JSON.stringify({
+      sessionId: 'path-not-visible',
+      runId: 'pre-fix',
+      hypothesisId: 'E',
+      location: 'DemoHome.vue:applyPreviewDayFromUrl',
+      msg: '[DEBUG] 应用预览 day 参数',
+      data: { rawDay, nextDayCount, finite: Number.isFinite(nextDayCount) },
+      ts: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+  if (!Number.isFinite(nextDayCount)) return
+
+  debugStore.setCustomDayCount(nextDayCount)
+  store.setDayCount(nextDayCount)
+}
+
 // 动画循环逻辑
 let rafId: number | null = null
 let lastTs = performance.now()
@@ -162,6 +202,7 @@ const loop = (ts: number) => {
 }
 
 onMounted(() => {
+  applyPreviewDayFromUrl()
   store.installDayCountBridge()
   lastTs = performance.now()
   rafId = window.requestAnimationFrame(loop)

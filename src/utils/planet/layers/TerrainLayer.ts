@@ -12,6 +12,7 @@ import { mats, resetPlanetGrassOverlay, setPlanetGrassOverlay } from '../assets/
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
+import { createWoodPlankPathGroup, getWoodPlankPathRevealState } from './woodPlankPath'
 
 type TerrainLayerOptions = {
   parentGroup: Group
@@ -26,6 +27,7 @@ export class TerrainLayer implements LayerController {
   private grassMesh: Mesh
   private planetRadius: number
   private rocks: InstancedMesh
+  private woodPlankPath: Group
   private rockMatrices: Matrix4[] = []
 
   constructor(options: TerrainLayerOptions) {
@@ -33,6 +35,8 @@ export class TerrainLayer implements LayerController {
     this.grassMesh = options.grassMesh
     this.planetRadius = options.planetRadius
     this.rocks = new InstancedMesh(new DodecahedronGeometry(0.14, 0), mats.rockInstanced, 8)
+    this.woodPlankPath = createWoodPlankPathGroup(this.planetRadius)
+    this.woodPlankPath.visible = false
     this.rocks.visible = false
     this.rocks.count = 8
     this.rocks.renderOrder = 2
@@ -45,6 +49,7 @@ export class TerrainLayer implements LayerController {
     grassMaterial.polygonOffsetFactor = 1
     grassMaterial.polygonOffsetUnits = 1
     this.grassMesh.renderOrder = 0
+    this.parentGroup.add(this.woodPlankPath)
     this.parentGroup.add(this.rocks)
   }
 
@@ -58,6 +63,7 @@ export class TerrainLayer implements LayerController {
 
   update(input: LayerUpdateInput) {
     const grassMaterial = this.grassMesh.material as MeshLambertMaterial
+    const woodPlanks = this.woodPlankPath.children as Group[]
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoTerrainTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).terrain : null
     const inheritedTerrainTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).terrain : null
@@ -88,6 +94,10 @@ export class TerrainLayer implements LayerController {
         resetPlanetGrassOverlay()
       }
 
+      this.woodPlankPath.visible = false
+      woodPlanks.forEach((plank) => {
+        plank.visible = false
+      })
       this.rocks.visible = stageOneDay >= 2
       this.rocks.count = stageOneDay === 2 ? 2 : stageOneDay >= 3 ? 4 : 0
       return
@@ -107,6 +117,19 @@ export class TerrainLayer implements LayerController {
         (input.stageIndex >= 5 ? '#86a95d' : input.stageIndex >= 3 ? '#7e9460' : '#6b7045'),
     )
 
+    if (input.stageIndex >= 3) {
+      const woodPlankReveal = getWoodPlankPathRevealState(input.dayCount)
+      this.woodPlankPath.visible = woodPlankReveal.visible
+      woodPlanks.forEach((plank, index) => {
+        plank.visible = woodPlankReveal.visible && index < woodPlankReveal.visiblePlankCount
+      })
+    } else {
+      this.woodPlankPath.visible = false
+      woodPlanks.forEach((plank) => {
+        plank.visible = false
+      })
+    }
+
     this.rocks.visible = input.stageIndex <= 2
     this.rocks.count = input.stageIndex === 2 ? stageTwoTerrainTuning?.rockCount ?? 8 : 0
   }
@@ -114,12 +137,37 @@ export class TerrainLayer implements LayerController {
   deactivate() {
     this.grassMesh.visible = false
     resetPlanetGrassOverlay()
+    this.woodPlankPath.visible = false
+    ;(this.woodPlankPath.children as Group[]).forEach((plank) => {
+      plank.visible = false
+    })
     this.rocks.visible = false
   }
 
   dispose() {
     resetPlanetGrassOverlay()
+    const disposedGeometries = new Set()
+    const disposedMaterials = new Set()
+    this.parentGroup.remove(this.woodPlankPath)
     this.parentGroup.remove(this.rocks)
+    this.woodPlankPath.traverse((child) => {
+      if (!(child instanceof Mesh)) return
+      if (!disposedGeometries.has(child.geometry)) {
+        child.geometry.dispose()
+        disposedGeometries.add(child.geometry)
+      }
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => {
+          if (disposedMaterials.has(material)) return
+          material.dispose()
+          disposedMaterials.add(material)
+        })
+        return
+      }
+      if (disposedMaterials.has(child.material)) return
+      ;(child.material as MeshLambertMaterial).dispose()
+      disposedMaterials.add(child.material)
+    })
     this.rocks.geometry.dispose()
   }
 
