@@ -83,10 +83,8 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 const PlanetCanvas = defineAsyncComponent(() => import('@/components/PlanetCanvas.vue'))
 const PlanetDebugPanel = defineAsyncComponent(() => import('@/components/PlanetDebugPanel.vue'))
 import { useGrowthStore } from '@/stores/growth'
-import { usePlanetDebugStore } from '@/stores/planetDebug'
 
 const store = useGrowthStore()
-const debugStore = usePlanetDebugStore()
 const canvasRef = ref<{
   jumpToDayCount: (dayCount: number) => void
   replayCurrentTransition: () => void

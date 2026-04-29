@@ -53,6 +53,7 @@
         @click="emit('replay-transition')">
         重播当前阶段过渡
       </button>
+
     </div>
   </section>
 </template>
@@ -71,7 +72,6 @@ const emit = defineEmits<{
 }>()
 
 const debugStore = usePlanetDebugStore()
-
 function onDayInput(event: Event) {
   const target = event.target as HTMLInputElement
   debugStore.setCustomDayCount(Number(target.value))
@@ -189,5 +189,6 @@ function onDayInput(event: Event) {
     padding: 6px 8px;
     font-size: 11px;
   }
+
 }
 </style>

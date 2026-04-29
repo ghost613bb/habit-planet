@@ -25,6 +25,8 @@ type StructureLayerOptions = {
   planetRadius: number
 }
 
+const CAMPFIRE_MODEL_SCALE_FACTOR = 0.95
+
 export class StructureLayer implements LayerController {
   id = 'structure'
 
@@ -116,7 +118,9 @@ export class StructureLayer implements LayerController {
     this.bench.visible = input.stageIndex >= 5
     this.swing.visible = input.stageIndex >= 5
 
-    this.campfire.scale.setScalar(input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1)
+    this.campfire.scale.setScalar(
+      (input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1) * CAMPFIRE_MODEL_SCALE_FACTOR,
+    )
     this.windmillRotor.rotation.z = input.stageIndex >= 4 ? input.dayCount * 0.12 : 0
     this.hutFull.scale.setScalar(input.stageIndex >= 4 ? 0.95 + input.stageProgress * 0.05 : 1)
     this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)

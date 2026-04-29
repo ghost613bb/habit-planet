@@ -28,11 +28,27 @@ type VegetationLayerOptions = {
   planetRadius: number
 }
 
+type BushAnchor = {
+  phi: number
+  theta: number
+}
+
 const SPROUT_SCALE_BOOST = 1.55
 const BUSH_SCALE_BOOST = 1.7
 const GRASS_PATCH_SCALE_BOOST = 1.75
 const LEAFY_TREE_SCALE_BOOST = 1.68
 const WIDE_TREE_SCALE_BOOST = 1.58
+const BUSH_MODEL_SCALE_FACTOR = 0.95
+const FLOWER_BUSH_MODEL_SCALE_FACTOR = 0.95
+const BUSH_OUTWARD_PHI_OFFSET = 0.09
+const BUSH_BASE_ANCHORS: BushAnchor[] = [
+  { phi: 0.42, theta: 1.02 },
+  { phi: 0.38, theta: 1.46 },
+  { phi: 0.24, theta: 2.4 },
+  // 第 4 颗草球按调试面板确认值固化到默认锚点，避免每次都要手调。
+  { phi: 0.32, theta: 5.33 },
+  { phi: 0.14, theta: 3.6 },
+]
 
 export class VegetationLayer implements LayerController {
   id = 'vegetation'
@@ -192,9 +208,9 @@ export class VegetationLayer implements LayerController {
       if (!bush) continue
       bush.visible = i < visibleBushCount
       bush.scale.setScalar(
-        inheritedVegetationTuning != null
+        (inheritedVegetationTuning != null
           ? inheritedVegetationTuning.bushScale
-          : (0.75 + input.stageProgress * 0.25) * BUSH_SCALE_BOOST,
+          : (0.75 + input.stageProgress * 0.25) * BUSH_SCALE_BOOST) * BUSH_MODEL_SCALE_FACTOR,
       )
     }
 
@@ -257,32 +273,28 @@ export class VegetationLayer implements LayerController {
   }
 
   private createBushes() {
-    const anchors = [
-      { phi: 0.42, theta: 1.02 },
-      { phi: 0.38, theta: 1.46 },
-      { phi: 0.24, theta: 2.4 },
-      { phi: 0.16, theta: 5.1 },
-      { phi: 0.14, theta: 3.6 },
-    ]
-
-    return anchors.map((anchor) => {
+    return BUSH_BASE_ANCHORS.map((anchor) => {
       const bush = new Group()
       const body = new Mesh(new SphereGeometry(0.16, 10, 10), mats.leaves2)
       body.scale.set(1.1, 0.8, 1.1)
       body.position.y = 0.14
       bush.add(body)
 
-      const { pos, quaternion } = getPlacementTransform(
-        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius,
-        'bush',
-      )
-      bush.position.copy(pos)
-      bush.quaternion.copy(quaternion)
+      this.applyBushPlacement(bush, anchor)
       bush.visible = false
 
       return bush
     })
+  }
+
+  private applyBushPlacement(bush: Group, anchor: BushAnchor) {
+    const { pos, quaternion } = getPlacementTransform(
+      new Vector3().setFromSphericalCoords(1, anchor.phi + BUSH_OUTWARD_PHI_OFFSET, anchor.theta),
+      this.planetRadius,
+      'bush',
+    )
+    bush.position.copy(pos)
+    bush.quaternion.copy(quaternion)
   }
 
   private createTrees() {
@@ -395,7 +407,7 @@ export class VegetationLayer implements LayerController {
 
       flowerBush.position.copy(pos)
       flowerBush.quaternion.copy(quaternion)
-      flowerBush.scale.setScalar(anchor.scale)
+      flowerBush.scale.setScalar(anchor.scale * FLOWER_BUSH_MODEL_SCALE_FACTOR)
       flowerBush.visible = false
 
       return flowerBush

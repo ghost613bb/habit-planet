@@ -1,8 +1,10 @@
-import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry } from 'three'
+import { Group, Mesh, MeshLambertMaterial, Object3D, SphereGeometry, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { getPlanetGrassOverlayState, resetPlanetGrassOverlay } from '../assets/Materials'
 import { getStageTwoDay, getStageTwoDayTuning } from '../config/stageTwoDayTuning'
+import { getPlacementTransform, getSurfaceTransform } from '../math/PlanetMath'
+import { DIRT_PATH_CENTER } from './dirtPath'
 import { TerrainLayer } from './TerrainLayer'
 import { VegetationLayer } from './VegetationLayer'
 
@@ -209,6 +211,70 @@ describe('阶段 2 早期植被', () => {
     expect(getFirstVisibleGrassPatchScale()).toBeCloseTo(0.515)
     expect(dayFourGrassPatchMinNormalizedY).toBeLessThan(stageOneDayThreeGrassPatchMinNormalizedY)
     expect(getVisibleGrassPatchMinNormalizedY()).toBeLessThanOrEqual(dayFourGrassPatchMinNormalizedY)
+  })
+
+  it('草球会统一向外圈留出中间区域，避免挤占房子和小路位置', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    vegetationLayer.update({
+      dayCount: 5,
+      stageIndex: 2 as const,
+      stageProgress: 0.2,
+      qualityTier: 'tier-1' as const,
+    })
+    await vegetationLayer.preload()
+
+    const visibleBushes = ((vegetationLayer as any).bushes as Object3D[]).filter((item) => item.visible)
+    const hutPos = getSurfaceTransform(new Vector3().setFromSphericalCoords(1, 0.2, 2.1), 3.02).pos
+    const dirtPathPos = getPlacementTransform(DIRT_PATH_CENTER.clone(), 3, 'default').pos
+    const maxNormalizedY = visibleBushes.reduce(
+      (maxValue, item) => Math.max(maxValue, item.position.clone().normalize().y),
+      0,
+    )
+    const minDistanceToHut = visibleBushes.reduce(
+      (minValue, item) => Math.min(minValue, item.position.distanceTo(hutPos)),
+      Number.POSITIVE_INFINITY,
+    )
+    const minDistanceToDirtPath = visibleBushes.reduce(
+      (minValue, item) => Math.min(minValue, item.position.distanceTo(dirtPathPos)),
+      Number.POSITIVE_INFINITY,
+    )
+
+    expect(visibleBushes).toHaveLength(3)
+    expect(maxNormalizedY).toBeLessThan(0.93)
+    expect(minDistanceToHut).toBeGreaterThan(0.34)
+    expect(minDistanceToDirtPath).toBeGreaterThan(0.65)
+  })
+
+  it('第 4 颗草球会保留面板确认后的默认落位', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    vegetationLayer.update({
+      dayCount: 8,
+      stageIndex: 2 as const,
+      stageProgress: 0.6,
+      qualityTier: 'tier-1' as const,
+    })
+    await vegetationLayer.preload()
+
+    const bushes = (vegetationLayer as any).bushes as Object3D[]
+    const fourthBush = bushes[3]
+    const expectedPlacement = getPlacementTransform(
+      new Vector3().setFromSphericalCoords(1, 0.41, 5.33),
+      3,
+      'bush',
+    )
+
+    expect(fourthBush).toBeDefined()
+    expect(fourthBush!.position.distanceTo(expectedPlacement.pos)).toBeLessThan(0.0001)
   })
 
   it('第 7-10 天草簇数量按天增长，且第 8-10 天都维持 4 个灌木与 2 棵树', async () => {
