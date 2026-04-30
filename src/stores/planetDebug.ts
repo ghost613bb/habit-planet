@@ -1,21 +1,12 @@
 import { defineStore } from 'pinia'
-import {
-  getDefaultCampfirePlacementDebugState,
-  resolveCampfirePlacementDebugState,
-} from '@/utils/planet/layers/campfirePlacement'
 
 type QualityTierLabel = 'tier-0' | 'tier-1' | 'tier-2'
-
-const defaultCampfireDebugState = getDefaultCampfirePlacementDebugState()
 
 export const usePlanetDebugStore = defineStore('planetDebug', {
   state: () => ({
     advancedOpen: false,
     qualityTierLabel: 'tier-1' as QualityTierLabel,
     customDayCount: 1,
-    campfireDebugEnabled: defaultCampfireDebugState.enabled,
-    campfireDebugPhi: defaultCampfireDebugState.phi,
-    campfireDebugTheta: defaultCampfireDebugState.theta,
   }),
   getters: {
     stageShortcuts: () => [
@@ -42,29 +33,6 @@ export const usePlanetDebugStore = defineStore('planetDebug', {
     setCustomDayCount(dayCount: number) {
       const safeDayCount = Number.isFinite(dayCount) ? Math.floor(dayCount) : 1
       this.customDayCount = Math.max(1, safeDayCount)
-    },
-    setCampfireDebugEnabled(enabled: boolean) {
-      this.campfireDebugEnabled = enabled
-    },
-    setCampfireDebugPhi(phi: number) {
-      const nextState = resolveCampfirePlacementDebugState({
-        enabled: true,
-        phi,
-        theta: this.campfireDebugTheta,
-      })
-      this.campfireDebugPhi = nextState.phi
-    },
-    setCampfireDebugTheta(theta: number) {
-      const nextState = resolveCampfirePlacementDebugState({
-        enabled: true,
-        phi: this.campfireDebugPhi,
-        theta,
-      })
-      this.campfireDebugTheta = nextState.theta
-    },
-    resetCampfireDebugPlacement() {
-      this.campfireDebugPhi = defaultCampfireDebugState.phi
-      this.campfireDebugTheta = defaultCampfireDebugState.theta
     },
   },
 })

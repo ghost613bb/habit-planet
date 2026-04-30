@@ -17,10 +17,8 @@ import {
   CAMPFIRE_STRUCTURE_RADIUS_OFFSET,
   CAMPFIRE_SURFACE_PHI,
   CAMPFIRE_SURFACE_THETA,
-  resolveCampfirePlacementDebugState,
 } from './campfirePlacement'
 import type { LayerController, LayerUpdateInput } from './contracts'
-import type { CampfirePlacementDebugState } from './campfirePlacement'
 
 type StructureLayerOptions = {
   parentGroup: Group
@@ -39,8 +37,6 @@ export class StructureLayer implements LayerController {
   private campfireTemplate: Group | null = null
   private campfireLoader = new GLTFLoader(new LoadingManager())
   private campfireLoadPromise: Promise<void> | null = null
-  private campfireSurfacePhi = CAMPFIRE_SURFACE_PHI
-  private campfireSurfaceTheta = CAMPFIRE_SURFACE_THETA
   private hutFull: Group
   private windmill: Group
   private windmillRotor: Group
@@ -135,32 +131,21 @@ export class StructureLayer implements LayerController {
     this.group.visible = false
   }
 
-  setCampfireDebugPlacement(debugPlacement?: CampfirePlacementDebugState | null) {
-    const nextPlacement = resolveCampfirePlacementDebugState(debugPlacement)
-    this.campfireSurfacePhi = nextPlacement.phi
-    this.campfireSurfaceTheta = nextPlacement.theta
-    this.updateCampfireTransform()
-  }
-
   dispose() {
     this.parentGroup.remove(this.group)
   }
 
   private createCampfire() {
     const group = new Group()
-    group.visible = false
-    this.updateCampfireTransform(group)
-
-    return group
-  }
-
-  private updateCampfireTransform(targetGroup: Group = this.campfire) {
     const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, this.campfireSurfacePhi, this.campfireSurfaceTheta),
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
       this.planetRadius + CAMPFIRE_STRUCTURE_RADIUS_OFFSET,
     )
-    targetGroup.position.copy(pos)
-    targetGroup.quaternion.copy(quaternion)
+    group.position.copy(pos)
+    group.quaternion.copy(quaternion)
+    group.visible = false
+
+    return group
   }
 
   private attachCampfireInstance() {

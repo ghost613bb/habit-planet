@@ -37,7 +37,6 @@ import { FxLayer } from './planet/layers/FxLayer'
 import { StructureLayer } from './planet/layers/StructureLayer'
 import { TerrainLayer } from './planet/layers/TerrainLayer'
 import { VegetationLayer } from './planet/layers/VegetationLayer'
-import type { CampfirePlacementDebugState } from './planet/layers/campfirePlacement'
 import { downgradeQualityTier, resolveInitialQualityTier } from './planet/runtime/qualityTier'
 import { createLayerSceneController } from './planet/runtime/layerSceneController'
 import { createStageOrchestrator } from './planet/runtime/stageOrchestrator'
@@ -130,7 +129,6 @@ export function createPlanetRenderer(input: {
   timeOfDay?: number
   stages?: unknown
   stageIndex?: number
-  campfireDebugPlacement?: CampfirePlacementDebugState
   onQualityTierChange?: (qualityTier: 'tier-0' | 'tier-1' | 'tier-2') => void
 }) {
   const { canvas, dayCount: initialDayCount, timeOfDay = 12 } = input
@@ -329,8 +327,6 @@ export function createPlanetRenderer(input: {
     parentGroup: planetGroup,
     planetRadius,
   })
-  structureLayer.setCampfireDebugPlacement(input.campfireDebugPlacement)
-  fxLayer.setCampfireDebugPlacement(input.campfireDebugPlacement)
   const characterLayer = new CharacterLayer({
     parentGroup: planetGroup,
     planetRadius,
@@ -472,10 +468,6 @@ export function createPlanetRenderer(input: {
     },
     getQualityTier() {
       return currentQualityTier
-    },
-    setCampfireDebugPlacement(debugPlacement: CampfirePlacementDebugState) {
-      structureLayer.setCampfireDebugPlacement(debugPlacement)
-      fxLayer.setCampfireDebugPlacement(debugPlacement)
     },
     dispose() {
       if (rafId != null) window.cancelAnimationFrame(rafId);

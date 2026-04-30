@@ -10,7 +10,6 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { CampfirePlacementDebugState } from '@/utils/planet/layers/campfirePlacement'
 import type { Stage } from '@/utils/planetRenderer'
 import { createPlanetRenderer } from '@/utils/planetRenderer'
 
@@ -19,9 +18,6 @@ const props = defineProps<{
   stages: Stage[] // 生长阶段配置数据
   stageIndex: number // 当前阶段索引
   dayCount: number // 当前天数/进度
-  campfireDebugEnabled: boolean
-  campfireDebugPhi: number
-  campfireDebugTheta: number
 }>()
 
 const emit = defineEmits<{
@@ -44,18 +40,6 @@ watch(
   },
 )
 
-watch(
-  () => [props.campfireDebugEnabled, props.campfireDebugPhi, props.campfireDebugTheta] as const,
-  ([enabled, phi, theta]) => {
-    const debugPlacement: CampfirePlacementDebugState = {
-      enabled,
-      phi,
-      theta,
-    }
-    renderer?.setCampfireDebugPlacement(debugPlacement)
-  },
-)
-
 // 组件挂载时初始化 3D 渲染器
 onMounted(() => {
   const hostEl = host.value
@@ -67,11 +51,6 @@ onMounted(() => {
     dayCount: props.dayCount,
     stages: props.stages,
     stageIndex: props.stageIndex,
-    campfireDebugPlacement: {
-      enabled: props.campfireDebugEnabled,
-      phi: props.campfireDebugPhi,
-      theta: props.campfireDebugTheta,
-    },
     onQualityTierChange: (qualityTier) => {
       emit('quality-tier-change', qualityTier)
     },

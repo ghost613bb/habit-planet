@@ -14,10 +14,8 @@ import {
   CAMPFIRE_LIGHT_RADIUS_OFFSET,
   CAMPFIRE_SURFACE_PHI,
   CAMPFIRE_SURFACE_THETA,
-  resolveCampfirePlacementDebugState,
 } from './campfirePlacement'
 import type { LayerController, LayerUpdateInput } from './contracts'
-import type { CampfirePlacementDebugState } from './campfirePlacement'
 
 type FxLayerOptions = {
   parentGroup: Group
@@ -32,8 +30,6 @@ export class FxLayer implements LayerController {
   private group: Group
   private campfireLight: PointLight
   private campfireGlow: Mesh
-  private campfireSurfacePhi = CAMPFIRE_SURFACE_PHI
-  private campfireSurfaceTheta = CAMPFIRE_SURFACE_THETA
   private orbitRing: Mesh
   private orbitRingOuter: Mesh
   private windowGlow: Mesh
@@ -109,13 +105,6 @@ export class FxLayer implements LayerController {
     this.group.visible = false
   }
 
-  setCampfireDebugPlacement(debugPlacement?: CampfirePlacementDebugState | null) {
-    const nextPlacement = resolveCampfirePlacementDebugState(debugPlacement)
-    this.campfireSurfacePhi = nextPlacement.phi
-    this.campfireSurfaceTheta = nextPlacement.theta
-    this.updateCampfireTransforms()
-  }
-
   dispose() {
     this.parentGroup.remove(this.group)
   }
@@ -128,7 +117,18 @@ export class FxLayer implements LayerController {
   }
 
   private setupTransforms() {
-    this.updateCampfireTransforms()
+    const campfireTransform = getSurfaceTransform(
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
+      this.planetRadius + CAMPFIRE_LIGHT_RADIUS_OFFSET,
+    )
+    this.campfireLight.position.copy(campfireTransform.pos)
+
+    const campfireGlowTransform = getSurfaceTransform(
+      new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
+      this.planetRadius + CAMPFIRE_GLOW_RADIUS_OFFSET,
+    )
+    this.campfireGlow.position.copy(campfireGlowTransform.pos)
+    this.campfireGlow.quaternion.copy(campfireGlowTransform.quaternion)
 
     this.orbitRing.rotation.x = Math.PI / 2
     this.orbitRingOuter.rotation.x = Math.PI / 2
@@ -145,20 +145,5 @@ export class FxLayer implements LayerController {
     this.orbitRing.visible = false
     this.orbitRingOuter.visible = false
     this.windowGlow.visible = false
-  }
-
-  private updateCampfireTransforms() {
-    const campfireTransform = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, this.campfireSurfacePhi, this.campfireSurfaceTheta),
-      this.planetRadius + CAMPFIRE_LIGHT_RADIUS_OFFSET,
-    )
-    this.campfireLight.position.copy(campfireTransform.pos)
-
-    const campfireGlowTransform = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, this.campfireSurfacePhi, this.campfireSurfaceTheta),
-      this.planetRadius + CAMPFIRE_GLOW_RADIUS_OFFSET,
-    )
-    this.campfireGlow.position.copy(campfireGlowTransform.pos)
-    this.campfireGlow.quaternion.copy(campfireGlowTransform.quaternion)
   }
 }
