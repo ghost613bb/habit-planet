@@ -44,7 +44,7 @@ const FLOWER_BUSH_MODEL_SCALE_FACTOR = 0.95
 const BUSH_OUTWARD_PHI_OFFSET = 0.09
 const BUSH_BASE_ANCHORS: BushAnchor[] = [
   { phi: 0.42, theta: 1.02 },
-  { phi: 0.38, theta: 1.46 },
+  { phi: 0.38, theta: 1.78 },
   { phi: 0.24, theta: 2.4 },
   // 第 4 颗草球按调试面板确认值固化到默认锚点，避免每次都要手调。
   { phi: 0.32, theta: 5.33 },
