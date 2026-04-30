@@ -16,6 +16,9 @@
         :stages="store.stages"
         :stage-index="store.stageIndex"
         :day-count="store.value"
+        :campfire-debug-enabled="debugStore.campfireDebugEnabled"
+        :campfire-debug-phi="debugStore.campfireDebugPhi"
+        :campfire-debug-theta="debugStore.campfireDebugTheta"
         @quality-tier-change="onQualityTierChange" />
     </main>
 

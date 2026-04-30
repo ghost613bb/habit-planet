@@ -40,6 +40,7 @@ describe('第三阶段木板小路图层集成', () => {
     })
     expect(woodPlankPath.visible).toBe(true)
     expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(1)
+    expect(woodPlanks.filter((plank) => plank.visible).map((plank) => plank.name)).toEqual(['wood-plank-4'])
 
     terrainLayer.update({
       dayCount: 16,
@@ -48,6 +49,11 @@ describe('第三阶段木板小路图层集成', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(3)
+    expect(woodPlanks.filter((plank) => plank.visible).map((plank) => plank.name)).toEqual([
+      'wood-plank-2',
+      'wood-plank-3',
+      'wood-plank-4',
+    ])
 
     terrainLayer.update({
       dayCount: 17,

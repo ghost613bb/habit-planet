@@ -8,7 +8,7 @@ import {
 } from 'three'
 
 import { getSurfaceTransformWithClearance } from '../math/PlanetMath'
-import { getDirtPathDirectionAt } from './dirtPath'
+import { DIRT_PATH_CENTER, getDirtPathDirectionAt } from './dirtPath'
 
 export type WoodPlankPathRevealState = {
   visible: boolean
@@ -26,12 +26,14 @@ type WoodPlankPlacement = {
 const WOOD_PLANK_COLOR = '#8a5d3b'
 const WOOD_PLANK_STRAP_COLOR = '#6d4427'
 const WOOD_PLANK_SURFACE_CLEARANCE = 0.032
+const WOOD_PLANK_ROUTE_ROTATION_AXIS = DIRT_PATH_CENTER.clone().normalize()
+const WOOD_PLANK_ROUTE_PERPENDICULAR_ANGLE = Math.PI / 2
 
 const WOOD_PLANK_PLACEMENTS: WoodPlankPlacement[] = [
-  { progress: 0.14, yawOffset: -0.32, tiltX: 0.06, tiltZ: -0.03, scale: new Vector3(0.92, 1, 1) },
-  { progress: 0.36, yawOffset: -0.14, tiltX: 0.04, tiltZ: 0.05, scale: new Vector3(0.88, 1, 0.96) },
-  { progress: 0.56, yawOffset: 0.12, tiltX: -0.05, tiltZ: -0.04, scale: new Vector3(0.94, 1, 1.02) },
-  { progress: 0.82, yawOffset: 0.28, tiltX: 0.03, tiltZ: 0.04, scale: new Vector3(0.9, 1, 0.94) },
+  { progress: 0.2, yawOffset: -0.08, tiltX: 0.03, tiltZ: -0.01, scale: new Vector3(0.96, 1, 1) },
+  { progress: 0.38, yawOffset: -0.03, tiltX: 0.02, tiltZ: 0.02, scale: new Vector3(0.94, 1, 0.98) },
+  { progress: 0.56, yawOffset: 0.04, tiltX: -0.02, tiltZ: -0.02, scale: new Vector3(0.96, 1, 1.02) },
+  { progress: 0.74, yawOffset: 0.08, tiltX: 0.02, tiltZ: 0.01, scale: new Vector3(0.94, 1, 0.98) },
 ]
 
 const HIDDEN_STATE: WoodPlankPathRevealState = {
@@ -88,6 +90,13 @@ function createWoodPlankMesh() {
   return plank
 }
 
+function getPerpendicularRouteDirection(progress: number) {
+  return getDirtPathDirectionAt(progress)
+    .clone()
+    .applyAxisAngle(WOOD_PLANK_ROUTE_ROTATION_AXIS, WOOD_PLANK_ROUTE_PERPENDICULAR_ANGLE)
+    .normalize()
+}
+
 export function getWoodPlankPathRevealState(dayCount: number): WoodPlankPathRevealState {
   const safeDay = normalizeDayCount(dayCount)
 
@@ -103,7 +112,7 @@ export function createWoodPlankPathGroup(planetRadius: number): Group {
 
   WOOD_PLANK_PLACEMENTS.forEach((placement, index) => {
     const plank = createWoodPlankMesh()
-    const pathNormal = getDirtPathDirectionAt(placement.progress)
+    const pathNormal = getPerpendicularRouteDirection(placement.progress)
     const { pos, quaternion } = getSurfaceTransformWithClearance(
       pathNormal,
       planetRadius,
@@ -112,7 +121,7 @@ export function createWoodPlankPathGroup(planetRadius: number): Group {
 
     plank.position.copy(pos)
     plank.quaternion.copy(quaternion)
-    plank.rotateY(placement.yawOffset)
+    plank.rotateY(Math.PI / 2 + placement.yawOffset)
     plank.rotateX(placement.tiltX)
     plank.rotateZ(placement.tiltZ)
     plank.scale.copy(placement.scale)

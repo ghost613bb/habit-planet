@@ -120,8 +120,9 @@ export class TerrainLayer implements LayerController {
     if (input.stageIndex >= 3) {
       const woodPlankReveal = getWoodPlankPathRevealState(input.dayCount)
       this.woodPlankPath.visible = woodPlankReveal.visible
+      const firstVisibleIndex = Math.max(0, woodPlanks.length - woodPlankReveal.visiblePlankCount)
       woodPlanks.forEach((plank, index) => {
-        plank.visible = woodPlankReveal.visible && index < woodPlankReveal.visiblePlankCount
+        plank.visible = woodPlankReveal.visible && index >= firstVisibleIndex
       })
     } else {
       this.woodPlankPath.visible = false

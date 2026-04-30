@@ -54,6 +54,44 @@
         重播当前阶段过渡
       </button>
 
+      <div class="debugSection">
+        <div class="debugRow">
+          <span>篝火位置调试</span>
+          <button
+            type="button"
+            class="actionChip"
+            @click="debugStore.setCampfireDebugEnabled(!debugStore.campfireDebugEnabled)">
+            {{ debugStore.campfireDebugEnabled ? '关闭' : '开启' }}
+          </button>
+        </div>
+        <div class="inputGrid">
+          <label class="inputField">
+            <span>Phi</span>
+            <input
+              class="dayInput"
+              type="number"
+              step="0.01"
+              :value="debugStore.campfireDebugPhi"
+              @input="onCampfirePhiInput" />
+          </label>
+          <label class="inputField">
+            <span>Theta</span>
+            <input
+              class="dayInput"
+              type="number"
+              step="0.01"
+              :value="debugStore.campfireDebugTheta"
+              @input="onCampfireThetaInput" />
+          </label>
+        </div>
+        <button
+          type="button"
+          class="actionChip wide"
+          @click="debugStore.resetCampfireDebugPlacement()">
+          重置篝火位置
+        </button>
+      </div>
+
     </div>
   </section>
 </template>
@@ -75,6 +113,16 @@ const debugStore = usePlanetDebugStore()
 function onDayInput(event: Event) {
   const target = event.target as HTMLInputElement
   debugStore.setCustomDayCount(Number(target.value))
+}
+
+function onCampfirePhiInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  debugStore.setCampfireDebugPhi(Number(target.value))
+}
+
+function onCampfireThetaInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  debugStore.setCampfireDebugTheta(Number(target.value))
 }
 </script>
 
@@ -133,6 +181,25 @@ function onDayInput(event: Event) {
   margin-bottom: 10px;
 }
 
+.debugSection {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.inputGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inputField {
+  display: grid;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+}
+
 .dayInput {
   flex: 1;
   min-width: 0;
@@ -182,6 +249,19 @@ function onDayInput(event: Event) {
   .customJump {
     gap: 6px;
     margin-bottom: 8px;
+  }
+
+  .debugSection {
+    margin-top: 8px;
+    gap: 6px;
+  }
+
+  .inputGrid {
+    gap: 6px;
+  }
+
+  .inputField {
+    font-size: 11px;
   }
 
   .dayInput {
