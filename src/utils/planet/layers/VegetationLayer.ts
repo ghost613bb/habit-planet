@@ -307,7 +307,7 @@ export class VegetationLayer implements LayerController {
       // 帐篷左侧直杆树（勿删）
       { phi: 0.48, theta: 5.72 },
       // 帐篷右侧直杆树（勿删）
-      { phi: 0.3, theta: 3.7 },
+      { phi: 0.4, theta: 3.7 },
       // 帐篷右侧多枝干树（勿删）
       { phi: 0.48, theta: 2.62 },
       { phi: 0.24, theta: 4.8 },
