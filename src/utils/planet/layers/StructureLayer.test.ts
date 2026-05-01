@@ -75,4 +75,49 @@ describe('结构图层中的第三阶段帐篷', () => {
 
     expect(tent.visible).toBe(true)
   })
+
+  it('第 19-21 天会在树外侧逐日累加栅栏，并在后续阶段保留', () => {
+    const layer = createLayer()
+    const woodenFences = (layer as any).woodenFences as Group[]
+
+    layer.update({
+      dayCount: 18,
+      stageIndex: 3 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(woodenFences.filter((item) => item.visible)).toHaveLength(0)
+
+    layer.update({
+      dayCount: 19,
+      stageIndex: 3 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(woodenFences.filter((item) => item.visible)).toHaveLength(1)
+
+    layer.update({
+      dayCount: 20,
+      stageIndex: 3 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(woodenFences.filter((item) => item.visible)).toHaveLength(2)
+
+    layer.update({
+      dayCount: 21,
+      stageIndex: 3 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(woodenFences.filter((item) => item.visible)).toHaveLength(4)
+
+    layer.update({
+      dayCount: 23,
+      stageIndex: 4 as const,
+      stageProgress: 0.2,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(woodenFences.filter((item) => item.visible)).toHaveLength(4)
+  })
 })

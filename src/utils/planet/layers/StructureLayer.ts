@@ -37,6 +37,8 @@ const TENT_PATH_BACK_OFFSET = -0.45
 const TENT_SIDE_OFFSET = 0.12
 const TENT_GRASS_CLEARANCE_ANGLE = 0.24
 const TENT_RIGHT_GRASS_OFFSET = 0.14
+const WOODEN_FENCE_MODEL_TARGET_HEIGHT = 0.58
+const WOODEN_FENCE_SURFACE_CLEARANCE = 0.02
 
 function getTentPlacementData(planetRadius: number) {
   const plankIndex = getFirstRevealedWoodPlankIndex()
@@ -86,6 +88,10 @@ export class StructureLayer implements LayerController {
   private tentTemplate: Group | null = null
   private tentLoader = new GLTFLoader(new LoadingManager())
   private tentLoadPromise: Promise<void> | null = null
+  private woodenFenceTemplate: Group | null = null
+  private woodenFenceLoader = new GLTFLoader(new LoadingManager())
+  private woodenFenceLoadPromise: Promise<void> | null = null
+  private woodenFences: Group[] = []
   private hutFull: Group
   private windmill: Group
   private windmillRotor: Group
@@ -100,6 +106,7 @@ export class StructureLayer implements LayerController {
 
     this.campfire = this.createCampfire()
     this.tent = this.createTent()
+    this.woodenFences = this.createWoodenFenceAnchors()
     this.hutFull = this.createHutFull()
     this.windmill = this.createWindmill()
     this.windmillRotor = this.windmill.children[1] as Group
@@ -109,6 +116,7 @@ export class StructureLayer implements LayerController {
     this.group.add(
       this.campfire,
       this.tent,
+      ...this.woodenFences,
       this.hutFull,
       this.windmill,
       this.bench,
@@ -117,7 +125,11 @@ export class StructureLayer implements LayerController {
   }
 
   preload(): Promise<void> {
-    return Promise.all([this.ensureCampfireTemplate(), this.ensureTentTemplate()]).then(() => undefined)
+    return Promise.all([
+      this.ensureCampfireTemplate(),
+      this.ensureTentTemplate(),
+      this.ensureWoodenFenceTemplate(),
+    ]).then(() => undefined)
   }
 
   private ensureCampfireTemplate(): Promise<void> {
@@ -194,6 +206,43 @@ export class StructureLayer implements LayerController {
     return this.tentLoadPromise
   }
 
+  private ensureWoodenFenceTemplate(): Promise<void> {
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.woodenFenceLoadPromise) {
+        this.woodenFenceTemplate = new Group()
+        this.attachWoodenFenceInstances()
+        this.woodenFenceLoadPromise = Promise.resolve()
+      }
+
+      return this.woodenFenceLoadPromise
+    }
+
+    if (!this.woodenFenceLoadPromise) {
+      const woodenFenceUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/wooden_fence/scene.gltf', globalThis.location.origin).toString()
+          : '/models/wooden_fence/scene.gltf'
+
+      this.woodenFenceLoadPromise = new Promise((resolve, reject) => {
+        this.woodenFenceLoader.load(
+          woodenFenceUrl,
+          (gltf) => {
+            this.woodenFenceTemplate = gltf.scene.clone(true)
+            this.attachWoodenFenceInstances()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.woodenFenceLoadPromise
+  }
+
   activate(input: LayerUpdateInput) {
     this.update(input)
   }
@@ -208,9 +257,19 @@ export class StructureLayer implements LayerController {
       // 第 18 天帐篷第一次出现时再懒加载，避免第三阶段前半段白白加载模型。
       void this.ensureTentTemplate()
     }
+    if (this.getVisibleWoodenFenceCount(input) > 0) {
+      // 第 19 天开始按天渐进出现栅栏，首次需要时再懒加载。
+      void this.ensureWoodenFenceTemplate()
+    }
 
     this.campfire.visible = input.stageIndex >= 2
     this.tent.visible = this.shouldShowTent(input)
+    const visibleWoodenFenceCount = this.getVisibleWoodenFenceCount(input)
+    for (let i = 0; i < this.woodenFences.length; i += 1) {
+      const woodenFence = this.woodenFences[i]
+      if (!woodenFence) continue
+      woodenFence.visible = i < visibleWoodenFenceCount
+    }
     this.hutFull.visible = input.stageIndex >= 4
     this.windmill.visible = input.stageIndex >= 4
     this.bench.visible = input.stageIndex >= 5
@@ -227,6 +286,16 @@ export class StructureLayer implements LayerController {
 
   private shouldShowTent(input: LayerUpdateInput) {
     return input.dayCount >= 18 && input.stageIndex >= 3
+  }
+
+  private getVisibleWoodenFenceCount(input: LayerUpdateInput) {
+    if (input.stageIndex < 3) return 0
+
+    const day = Math.floor(input.dayCount)
+    if (day < 19) return 0
+    if (day === 19) return 1
+    if (day === 20) return 2
+    return 4
   }
 
   deactivate() {
@@ -316,6 +385,51 @@ export class StructureLayer implements LayerController {
     instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
 
     this.tent.add(instance)
+  }
+
+  private createWoodenFenceAnchors() {
+    // 勿动
+    const anchors = [
+      // 前两个是蓝花丛侧两个栅栏，后两个是粉花丛侧两个栅栏
+      { phi: 0.66, theta: 2.66, rotationY: 0.86 },
+      { phi: 0.68, theta: 3.28, rotationY: 1.98 },
+      { phi: -0.73, theta: 2.42, rotationY: 0.85 },
+      { phi: -0.63, theta: 1.92, rotationY: 0.08 },
+    ]
+
+    return anchors.map((anchor) => {
+      const woodenFence = new Group()
+      const { pos, quaternion } = getSurfaceTransformWithClearance(
+        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+        this.planetRadius,
+        WOODEN_FENCE_SURFACE_CLEARANCE,
+      )
+      woodenFence.position.copy(pos)
+      woodenFence.quaternion.copy(quaternion)
+      woodenFence.rotateY(anchor.rotationY)
+      woodenFence.visible = false
+
+      return woodenFence
+    })
+  }
+
+  private attachWoodenFenceInstances() {
+    this.woodenFences.forEach((woodenFence) => {
+      woodenFence.clear()
+      if (!this.woodenFenceTemplate) return
+
+      const instance = this.woodenFenceTemplate.clone(true)
+      const bounds = new Box3().setFromObject(instance)
+      const size = bounds.getSize(new Vector3())
+      const center = bounds.getCenter(new Vector3())
+      const safeHeight = Math.max(size.y, 0.001)
+      const scale = WOODEN_FENCE_MODEL_TARGET_HEIGHT / safeHeight
+
+      instance.scale.setScalar(scale)
+      instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
+
+      woodenFence.add(instance)
+    })
   }
 
   private createHutFull() {

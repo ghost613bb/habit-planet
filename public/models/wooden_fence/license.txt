@@ -1,0 +1,11 @@
+Model Information:
+* title:	Wooden Fence
+* source:	https://sketchfab.com/3d-models/wooden-fence-8663b19f763f4a358537be148ba082fa
+* author:	SamMiller (https://sketchfab.com/SamMiller)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Wooden Fence" (https://sketchfab.com/3d-models/wooden-fence-8663b19f763f4a358537be148ba082fa) by SamMiller (https://sketchfab.com/SamMiller) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
