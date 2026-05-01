@@ -41,13 +41,6 @@ type BushAnchor = {
   theta: number
 }
 
-type LowPolyFlowerAnchor = {
-  phi: number
-  theta: number
-  scale: number
-  yaw: number
-}
-
 const SPROUT_SCALE_BOOST = 1.55
 const BUSH_SCALE_BOOST = 1.7
 const GRASS_PATCH_SCALE_BOOST = 1.75
@@ -66,22 +59,8 @@ const BUSH_BASE_ANCHORS: BushAnchor[] = [
   { phi: 0.32, theta: 5.33 },
   { phi: 0.14, theta: 3.6 },
 ]
-const LOW_POLY_FLOWER_BASE_ANCHORS: LowPolyFlowerAnchor[] = [
-  { phi: 0.22, theta: 0.18, scale: 0.94, yaw: 0.16 },
-  { phi: 0.2, theta: 1.58, scale: 0.98, yaw: 0.54 },
-  { phi: 0.18, theta: 2.3, scale: 0.92, yaw: -0.28 },
-  { phi: 0.24, theta: 3.02, scale: 1, yaw: 0.42 },
-  { phi: 0.22, theta: 3.8, scale: 0.96, yaw: -0.14 },
-  { phi: 0.26, theta: 4.54, scale: 0.93, yaw: 0.2 },
-  { phi: 0.24, theta: 5.28, scale: 1.02, yaw: -0.48 },
-  { phi: 0.34, theta: 0.64, scale: 0.97, yaw: 0.18 },
-  { phi: 0.32, theta: 1.98, scale: 1.04, yaw: -0.24 },
-  { phi: 0.36, theta: 2.78, scale: 0.95, yaw: 0.36 },
-  { phi: 0.34, theta: 4.14, scale: 1.01, yaw: -0.32 },
-  { phi: 0.38, theta: 4.96, scale: 0.94, yaw: 0.3 },
-  { phi: 0.46, theta: 1.18, scale: 0.99, yaw: -0.18 },
-  { phi: 0.48, theta: 3.42, scale: 1.03, yaw: 0.28 },
-]
+// 花朵继续复用草簇锚点，但优先选择远离木板路径与中轴通道的位置，避免贴近木块模型。
+const LOW_POLY_FLOWER_GRASS_PATCH_INDICES = [20, 33, 40, 47, 54, 60, 67, 73, 79, 84, 88, 91, 94, 97] as const
 
 export class VegetationLayer implements LayerController {
   id = 'vegetation'
@@ -486,17 +465,21 @@ export class VegetationLayer implements LayerController {
   }
 
   private createLowPolyFlowerAnchors() {
-    return LOW_POLY_FLOWER_BASE_ANCHORS.map((anchor) => {
+    return LOW_POLY_FLOWER_GRASS_PATCH_INDICES.map((grassPatchIndex) => {
+      const grassPatch = this.grassPatches[grassPatchIndex]
       const flower = new Group()
+      const pathAnchorNormal =
+        (grassPatch?.userData.pathAnchorNormal as Vector3 | undefined)?.clone() ?? new Vector3(0, 1, 0)
       const { pos, quaternion } = getSurfaceTransformWithClearance(
-        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+        pathAnchorNormal,
         this.planetRadius,
         LOW_POLY_FLOWER_SURFACE_CLEARANCE,
       )
 
       flower.position.copy(pos)
       flower.quaternion.copy(quaternion)
-      flower.rotation.y = anchor.yaw
+      flower.userData.grassPatchIndex = grassPatchIndex
+      flower.userData.pathAnchorNormal = pathAnchorNormal
       flower.visible = false
 
       return flower
@@ -511,6 +494,14 @@ export class VegetationLayer implements LayerController {
   private getLowPolyFlowerVariant(index: number): LowPolyFlowerVariant {
     const variants: LowPolyFlowerVariant[] = ['upright', 'wide', 'lean']
     return variants[Math.floor(this.getDeterministicFlowerUnit(index) * variants.length)] ?? 'upright'
+  }
+
+  private getLowPolyFlowerScale(index: number) {
+    return 0.94 + this.getDeterministicFlowerUnit(index + 11) * 0.12
+  }
+
+  private getLowPolyFlowerYaw(index: number) {
+    return this.getDeterministicFlowerUnit(index + 23) * Math.PI * 2
   }
 
   private attachGrassPatchInstances() {
@@ -572,14 +563,11 @@ export class VegetationLayer implements LayerController {
 
   private attachLowPolyFlowerInstances() {
     this.lowPolyFlowers.forEach((flower, index) => {
-      const anchor = LOW_POLY_FLOWER_BASE_ANCHORS[index]
-      if (!anchor) return
-
       flower.clear()
       flower.add(
         createLowPolyFlowerInstance({
-          targetHeight: LOW_POLY_FLOWER_TARGET_HEIGHT * anchor.scale,
-          rotationY: anchor.yaw,
+          targetHeight: LOW_POLY_FLOWER_TARGET_HEIGHT * this.getLowPolyFlowerScale(index),
+          rotationY: this.getLowPolyFlowerYaw(index),
           variant: this.getLowPolyFlowerVariant(index),
         }),
       )
