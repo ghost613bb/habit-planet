@@ -35,6 +35,42 @@ const TENT_MODEL_TARGET_HEIGHT = 0.7
 const TENT_SURFACE_CLEARANCE = 0.018
 const TENT_PATH_BACK_OFFSET = -0.45
 const TENT_SIDE_OFFSET = 0.12
+const TENT_GRASS_CLEARANCE_ANGLE = 0.24
+const TENT_RIGHT_GRASS_OFFSET = 0.14
+
+function getTentPlacementData(planetRadius: number) {
+  const plankIndex = getFirstRevealedWoodPlankIndex()
+  const plankNormal = getWoodPlankSurfaceNormal(plankIndex)
+  const pathTangent = getWoodPlankPathTangent(plankIndex)
+  const { pos: plankSurfacePos } = getSurfaceTransformWithClearance(plankNormal, planetRadius)
+  const leftDirection = plankNormal.clone().cross(pathTangent).normalize()
+  const tentAnchorPos = plankSurfacePos
+    .clone()
+    .addScaledVector(pathTangent, -TENT_PATH_BACK_OFFSET)
+    .addScaledVector(leftDirection, TENT_SIDE_OFFSET)
+
+  return {
+    plankNormal,
+    leftDirection,
+    tentSurfaceNormal: tentAnchorPos.normalize(),
+  }
+}
+
+export function isGrassPatchBlockedByTent(normal: Vector3, dayCount: number, planetRadius: number) {
+  if (dayCount < 18) return false
+
+  const safeNormal = normal.clone().normalize()
+  const { leftDirection, tentSurfaceNormal } = getTentPlacementData(planetRadius)
+  const rightTentSurfaceNormal = tentSurfaceNormal
+    .clone()
+    .addScaledVector(leftDirection, -TENT_RIGHT_GRASS_OFFSET)
+    .normalize()
+
+  return (
+    safeNormal.angleTo(tentSurfaceNormal) <= TENT_GRASS_CLEARANCE_ANGLE ||
+    safeNormal.angleTo(rightTentSurfaceNormal) <= TENT_GRASS_CLEARANCE_ANGLE
+  )
+}
 
 export class StructureLayer implements LayerController {
   id = 'structure'
@@ -234,18 +270,9 @@ export class StructureLayer implements LayerController {
 
   private createTent() {
     const group = new Group()
-    const plankIndex = getFirstRevealedWoodPlankIndex()
-    const plankNormal = getWoodPlankSurfaceNormal(plankIndex)
-    const pathTangent = getWoodPlankPathTangent(plankIndex)
-    const { pos: plankSurfacePos } = getSurfaceTransformWithClearance(plankNormal, this.planetRadius)
-    const leftDirection = plankNormal.clone().cross(pathTangent).normalize()
-    const tentAnchorPos = plankSurfacePos
-      .clone()
-      .addScaledVector(pathTangent, -TENT_PATH_BACK_OFFSET)
-      .addScaledVector(leftDirection, TENT_SIDE_OFFSET)
-    const tentNormal = tentAnchorPos.normalize()
+    const { plankNormal, tentSurfaceNormal } = getTentPlacementData(this.planetRadius)
     const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
-      tentNormal,
+      tentSurfaceNormal,
       this.planetRadius,
       TENT_SURFACE_CLEARANCE,
     )

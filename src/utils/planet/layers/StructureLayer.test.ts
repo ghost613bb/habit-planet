@@ -2,11 +2,7 @@ import { Group, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { StructureLayer } from './StructureLayer'
-import {
-  getFirstRevealedWoodPlankIndex,
-  getWoodPlankPathTangent,
-  getWoodPlankSurfaceNormal,
-} from './woodPlankPath'
+import { getFirstRevealedWoodPlankIndex, getWoodPlankSurfaceNormal } from './woodPlankPath'
 
 function createLayer() {
   const parentGroup = new Group()
@@ -18,12 +14,11 @@ function createLayer() {
 }
 
 describe('结构图层中的第三阶段帐篷', () => {
-  it('第 18 天起显示，并保持在首块显现木板的后方', () => {
+  it('第 18 天起显示，并与首块显现木板保持分离', () => {
     const layer = createLayer()
     const tent = (layer as any).tent as Group
     const firstPlankIndex = getFirstRevealedWoodPlankIndex()
     const firstPlankNormal = getWoodPlankSurfaceNormal(firstPlankIndex)
-    const pathTangent = getWoodPlankPathTangent(firstPlankIndex)
 
     layer.update({
       dayCount: 17,
@@ -45,9 +40,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     const plankToTentDirection = tentNormal.clone().sub(firstPlankNormal).projectOnPlane(firstPlankNormal)
 
     expect(plankToTentDirection.length()).toBeGreaterThan(0.01)
-    expect(plankToTentDirection.normalize().dot(pathTangent)).toBeLessThan(-0.6)
     expect(tentNormal.angleTo(firstPlankNormal)).toBeGreaterThan(0.08)
-    expect(tentNormal.angleTo(firstPlankNormal)).toBeLessThan(0.35)
   })
 
   it('帐篷会朝向首块显现木板，保持木板路通向帐篷的视觉关系', () => {

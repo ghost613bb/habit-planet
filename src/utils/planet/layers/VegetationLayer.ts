@@ -22,6 +22,7 @@ import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
+import { isGrassPatchBlockedByTent } from './StructureLayer'
 import { isGrassPatchBlockedByWoodPlankPath } from './woodPlankPath'
 
 type VegetationLayerOptions = {
@@ -197,7 +198,9 @@ export class VegetationLayer implements LayerController {
       const pathAnchorNormal = patch.userData.pathAnchorNormal as Vector3 | undefined
       const blockedByWoodPlank =
         pathAnchorNormal != null && isGrassPatchBlockedByWoodPlankPath(pathAnchorNormal, input.dayCount)
-      patch.visible = i < totalVisibleGrassPatchCount && !blockedByWoodPlank
+      const blockedByTent =
+        pathAnchorNormal != null && isGrassPatchBlockedByTent(pathAnchorNormal, input.dayCount, this.planetRadius)
+      patch.visible = i < totalVisibleGrassPatchCount && !blockedByWoodPlank && !blockedByTent
       if (unifiedGrassPatchScale != null) {
         patch.scale.setScalar(unifiedGrassPatchScale)
       }
