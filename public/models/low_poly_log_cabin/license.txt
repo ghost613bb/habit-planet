@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low poly log cabin
+* source:	https://sketchfab.com/3d-models/low-poly-log-cabin-6e8fe411056e47a48bd9cd7ebe2d458a
+* author:	Igeeig (https://sketchfab.com/tylerhennessy0)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low poly log cabin" (https://sketchfab.com/3d-models/low-poly-log-cabin-6e8fe411056e47a48bd9cd7ebe2d458a) by Igeeig (https://sketchfab.com/tylerhennessy0) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

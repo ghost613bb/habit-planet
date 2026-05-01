@@ -10,6 +10,7 @@ import {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
+import { getStageFourCabinDayTuning } from '../config/stageFourCabinDayTuning'
 import { getSurfaceTransform, getSurfaceTransformWithClearance } from '../math/PlanetMath'
 import {
   CAMPFIRE_MODEL_TARGET_HEIGHT,
@@ -39,8 +40,14 @@ const TENT_GRASS_CLEARANCE_ANGLE = 0.24
 const TENT_RIGHT_GRASS_OFFSET = 0.14
 const WOODEN_FENCE_MODEL_TARGET_HEIGHT = 0.58
 const WOODEN_FENCE_SURFACE_CLEARANCE = 0.02
-const STAGE_THREE_END_STATE_START_DAY = 22
-const STAGE_THREE_END_STATE_END_DAY = 45
+const CABIN_MODEL_TARGET_HEIGHT = 1.5
+const CABIN_TRANSITION_START_DAY = 22
+const CABIN_TRANSITION_END_DAY = 28
+const CABIN_STAGE_END_DAY = 45
+const CABIN_SURFACE_CLEARANCE_MICRO_FACTOR = 1 / 6
+const CABIN_INSTANCE_SINK_OFFSET = 0.45
+const CABIN_SURFACE_CLEARANCE_BASELINE =
+  getStageFourCabinDayTuning(CABIN_TRANSITION_START_DAY).surfaceClearance
 
 function getTentPlacementData(planetRadius: number) {
   const plankIndex = getFirstRevealedWoodPlankIndex()
@@ -58,6 +65,17 @@ function getTentPlacementData(planetRadius: number) {
     leftDirection,
     tentSurfaceNormal: tentAnchorPos.normalize(),
   }
+}
+
+function getCabinSurfaceClearance(surfaceClearance: number) {
+  return (
+    TENT_SURFACE_CLEARANCE +
+    Math.min(
+      0,
+      CABIN_SURFACE_CLEARANCE_BASELINE - surfaceClearance,
+    ) *
+      CABIN_SURFACE_CLEARANCE_MICRO_FACTOR
+  )
 }
 
 export function isGrassPatchBlockedByTent(normal: Vector3, dayCount: number, planetRadius: number) {
@@ -90,6 +108,9 @@ export class StructureLayer implements LayerController {
   private tentTemplate: Group | null = null
   private tentLoader = new GLTFLoader(new LoadingManager())
   private tentLoadPromise: Promise<void> | null = null
+  private cabinTemplate: Group | null = null
+  private cabinLoader = new GLTFLoader(new LoadingManager())
+  private cabinLoadPromise: Promise<void> | null = null
   private woodenFenceTemplate: Group | null = null
   private woodenFenceLoader = new GLTFLoader(new LoadingManager())
   private woodenFenceLoadPromise: Promise<void> | null = null
@@ -130,6 +151,7 @@ export class StructureLayer implements LayerController {
     return Promise.all([
       this.ensureCampfireTemplate(),
       this.ensureTentTemplate(),
+      this.ensureCabinTemplate(),
       this.ensureWoodenFenceTemplate(),
     ]).then(() => undefined)
   }
@@ -208,6 +230,46 @@ export class StructureLayer implements LayerController {
     return this.tentLoadPromise
   }
 
+  private ensureCabinTemplate(): Promise<void> {
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.cabinLoadPromise) {
+        const mockCabinTemplate = new Group()
+        // 测试环境里补一个最小占位体，保证包围盒与缩放逻辑可验证。
+        mockCabinTemplate.add(new Mesh(new BoxGeometry(1, 1, 1), mats.houseBody))
+        this.cabinTemplate = mockCabinTemplate
+        this.attachCabinInstance()
+        this.cabinLoadPromise = Promise.resolve()
+      }
+
+      return this.cabinLoadPromise
+    }
+
+    if (!this.cabinLoadPromise) {
+      const cabinUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/low_poly_log_cabin/scene.gltf', globalThis.location.origin).toString()
+          : '/models/low_poly_log_cabin/scene.gltf'
+
+      this.cabinLoadPromise = new Promise((resolve, reject) => {
+        this.cabinLoader.load(
+          cabinUrl,
+          (gltf) => {
+            this.cabinTemplate = gltf.scene.clone(true)
+            this.attachCabinInstance()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.cabinLoadPromise
+  }
+
   private ensureWoodenFenceTemplate(): Promise<void> {
     const isJsdomEnvironment =
       typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
@@ -250,8 +312,9 @@ export class StructureLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
-    const shouldHoldStageThreeEndState = this.shouldHoldStageThreeEndState(input)
-    const shouldShowStageFourStructures = input.stageIndex >= 4 && !shouldHoldStageThreeEndState
+    const shouldShowCabin = this.shouldShowCabin(input)
+    const shouldShowWindmill = input.stageIndex >= 5
+    const cabinDayTuning = this.getCabinDayTuning(input.dayCount)
 
     if (input.stageIndex >= 2) {
       // 真实运行链路不会主动预加载，这里在第一次需要展示篝火时懒加载一次。
@@ -266,6 +329,11 @@ export class StructureLayer implements LayerController {
       // 第 19 天开始按天渐进出现栅栏，首次需要时再懒加载。
       void this.ensureWoodenFenceTemplate()
     }
+    if (shouldShowCabin || shouldShowWindmill) {
+      // 房屋在第四阶段后半段与第五阶段延续出现，首次需要时再懒加载。
+      void this.ensureCabinTemplate()
+      this.updateCabinTransform(cabinDayTuning)
+    }
 
     this.campfire.visible = input.stageIndex >= 2
     this.tent.visible = this.shouldShowTent(input)
@@ -275,31 +343,25 @@ export class StructureLayer implements LayerController {
       if (!woodenFence) continue
       woodenFence.visible = i < visibleWoodenFenceCount
     }
-    this.hutFull.visible = shouldShowStageFourStructures
-    this.windmill.visible = shouldShowStageFourStructures
+    this.hutFull.visible = shouldShowCabin || shouldShowWindmill
+    this.windmill.visible = shouldShowWindmill
     this.bench.visible = input.stageIndex >= 5
     this.swing.visible = input.stageIndex >= 5
 
     this.campfire.scale.setScalar(
       (input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1) * CAMPFIRE_MODEL_SCALE_FACTOR,
     )
-    this.windmillRotor.rotation.z = shouldShowStageFourStructures ? input.dayCount * 0.12 : 0
-    this.hutFull.scale.setScalar(
-      shouldShowStageFourStructures ? 0.95 + input.stageProgress * 0.05 : 1,
-    )
+    this.windmillRotor.rotation.z = shouldShowWindmill ? input.dayCount * 0.12 : 0
     this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
     this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
   }
 
-  private shouldHoldStageThreeEndState(input: LayerUpdateInput) {
-    return (
-      input.dayCount >= STAGE_THREE_END_STATE_START_DAY &&
-      input.dayCount <= STAGE_THREE_END_STATE_END_DAY
-    )
+  private shouldShowCabin(input: LayerUpdateInput) {
+    return input.stageIndex >= 4 && input.dayCount >= CABIN_TRANSITION_START_DAY && input.dayCount <= CABIN_STAGE_END_DAY
   }
 
   private shouldShowTent(input: LayerUpdateInput) {
-    return input.dayCount >= 18 && input.stageIndex >= 3
+    return input.dayCount >= 18 && input.stageIndex >= 3 && input.dayCount < CABIN_TRANSITION_START_DAY
   }
 
   private getVisibleWoodenFenceCount(input: LayerUpdateInput) {
@@ -310,6 +372,14 @@ export class StructureLayer implements LayerController {
     if (day === 19) return 1
     if (day === 20) return 2
     return 4
+  }
+
+  private getCabinDayTuning(dayCount: number) {
+    if (dayCount <= CABIN_TRANSITION_END_DAY) {
+      return getStageFourCabinDayTuning(dayCount)
+    }
+
+    return getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)
   }
 
   deactivate() {
@@ -362,13 +432,13 @@ export class StructureLayer implements LayerController {
 
     group.position.copy(pos)
     group.quaternion.copy(quaternion)
-    this.alignTentFacing(group, surfaceNormal, plankNormal)
+    this.alignFacingToSurfaceTarget(group, surfaceNormal, plankNormal)
     group.visible = false
 
     return group
   }
 
-  private alignTentFacing(group: Group, surfaceNormal: Vector3, targetNormal: Vector3) {
+  private alignFacingToSurfaceTarget(group: Group, surfaceNormal: Vector3, targetNormal: Vector3) {
     const facingTarget = targetNormal.clone().projectOnPlane(surfaceNormal)
     if (facingTarget.lengthSq() <= 1e-6) return
 
@@ -399,6 +469,42 @@ export class StructureLayer implements LayerController {
     instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
 
     this.tent.add(instance)
+  }
+
+  private updateCabinTransform(cabinDayTuning = getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)) {
+    const { plankNormal, tentSurfaceNormal } = getTentPlacementData(this.planetRadius)
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      tentSurfaceNormal,
+      this.planetRadius,
+      getCabinSurfaceClearance(cabinDayTuning.surfaceClearance),
+    )
+
+    this.hutFull.position.copy(pos)
+    this.hutFull.quaternion.copy(quaternion)
+    this.alignFacingToSurfaceTarget(this.hutFull, surfaceNormal, plankNormal)
+    this.hutFull.rotateY(cabinDayTuning.yawOffset)
+    this.hutFull.scale.setScalar(cabinDayTuning.houseScale)
+  }
+
+  private attachCabinInstance() {
+    this.hutFull.clear()
+    if (!this.cabinTemplate) return
+
+    const instance = this.cabinTemplate.clone(true)
+    const bounds = new Box3().setFromObject(instance)
+    const size = bounds.getSize(new Vector3())
+    const center = bounds.getCenter(new Vector3())
+    const safeHeight = Math.max(size.y, 0.001)
+    const scale = CABIN_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.scale.setScalar(scale)
+    instance.position.set(
+      -center.x * scale,
+      -bounds.min.y * scale - CABIN_INSTANCE_SINK_OFFSET,
+      -center.z * scale,
+    )
+
+    this.hutFull.add(instance)
   }
 
   private createWoodenFenceAnchors() {
@@ -448,31 +554,18 @@ export class StructureLayer implements LayerController {
 
   private createHutFull() {
     const group = new Group()
-    const body = new Mesh(new BoxGeometry(0.72, 0.5, 0.54), mats.houseBody)
-    body.position.y = 0.28
-
-    const roofLeft = new Mesh(new BoxGeometry(0.5, 0.12, 0.62), mats.houseRoof)
-    roofLeft.position.set(-0.14, 0.64, 0)
-    roofLeft.rotation.z = Math.PI / 5
-
-    const roofRight = new Mesh(new BoxGeometry(0.5, 0.12, 0.62), mats.houseRoof)
-    roofRight.position.set(0.14, 0.64, 0)
-    roofRight.rotation.z = -Math.PI / 5
-
-    const door = new Mesh(new BoxGeometry(0.16, 0.28, 0.04), mats.door)
-    door.position.set(0, 0.14, 0.3)
-
-    const window = new Mesh(new BoxGeometry(0.12, 0.12, 0.03), mats.window)
-    window.position.set(0.21, 0.3, 0.3)
-
-    group.add(body, roofLeft, roofRight, door, window)
-
-    const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.2, 2.1),
-      this.planetRadius + 0.02,
+    const cabinDayTuning = getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)
+    const { plankNormal, tentSurfaceNormal } = getTentPlacementData(this.planetRadius)
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      tentSurfaceNormal,
+      this.planetRadius,
+      getCabinSurfaceClearance(cabinDayTuning.surfaceClearance),
     )
     group.position.copy(pos)
     group.quaternion.copy(quaternion)
+    this.alignFacingToSurfaceTarget(group, surfaceNormal, plankNormal)
+    group.rotateY(cabinDayTuning.yawOffset)
+    group.scale.setScalar(cabinDayTuning.houseScale)
     group.visible = false
 
     return group
