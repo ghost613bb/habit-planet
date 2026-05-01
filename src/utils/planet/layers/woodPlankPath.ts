@@ -28,6 +28,7 @@ const WOOD_PLANK_STRAP_COLOR = '#6d4427'
 const WOOD_PLANK_SURFACE_CLEARANCE = 0.032
 const WOOD_PLANK_ROUTE_ROTATION_AXIS = DIRT_PATH_CENTER.clone().normalize()
 const WOOD_PLANK_ROUTE_PERPENDICULAR_ANGLE = Math.PI / 2
+const WOOD_PLANK_GRASS_CLEARANCE_ANGLE = 0.11
 
 const WOOD_PLANK_PLACEMENTS: WoodPlankPlacement[] = [
   { progress: 0.2, yawOffset: -0.08, tiltX: 0.03, tiltZ: -0.01, scale: new Vector3(0.96, 1, 1) },
@@ -97,6 +98,13 @@ function getPerpendicularRouteDirection(progress: number) {
     .normalize()
 }
 
+function getFirstVisibleWoodPlankIndex(dayCount: number) {
+  const revealState = getWoodPlankPathRevealState(dayCount)
+  if (!revealState.visible) return WOOD_PLANK_PLACEMENTS.length
+
+  return Math.max(0, WOOD_PLANK_PLACEMENTS.length - revealState.visiblePlankCount)
+}
+
 export function getWoodPlankPathRevealState(dayCount: number): WoodPlankPathRevealState {
   const safeDay = normalizeDayCount(dayCount)
 
@@ -105,6 +113,24 @@ export function getWoodPlankPathRevealState(dayCount: number): WoodPlankPathReve
   if (safeDay === 16) return DAY_SIXTEEN_STATE
 
   return FULL_STATE
+}
+
+export function getWoodPlankSurfaceNormal(index: number) {
+  const placement =
+    WOOD_PLANK_PLACEMENTS[MathUtils.clamp(index, 0, WOOD_PLANK_PLACEMENTS.length - 1)]
+
+  return getPerpendicularRouteDirection(placement!.progress)
+}
+
+export function isGrassPatchBlockedByWoodPlankPath(normal: Vector3, dayCount: number) {
+  const firstVisibleIndex = getFirstVisibleWoodPlankIndex(dayCount)
+  if (firstVisibleIndex >= WOOD_PLANK_PLACEMENTS.length) return false
+
+  const safeNormal = normal.clone().normalize()
+  return WOOD_PLANK_PLACEMENTS.slice(firstVisibleIndex).some((placement) => {
+    const plankNormal = getPerpendicularRouteDirection(placement.progress)
+    return safeNormal.angleTo(plankNormal) <= WOOD_PLANK_GRASS_CLEARANCE_ANGLE
+  })
 }
 
 export function createWoodPlankPathGroup(planetRadius: number): Group {

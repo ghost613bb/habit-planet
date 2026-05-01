@@ -21,8 +21,8 @@ import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '.
 import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform } from '../math/PlanetMath'
-import { isGrassPatchBlockedByDirtPath } from './dirtPath'
 import type { LayerController, LayerUpdateInput } from './contracts'
+import { isGrassPatchBlockedByWoodPlankPath } from './woodPlankPath'
 
 type VegetationLayerOptions = {
   parentGroup: Group
@@ -195,37 +195,12 @@ export class VegetationLayer implements LayerController {
       const patch = this.grassPatches[i]
       if (!patch) continue
       const pathAnchorNormal = patch.userData.pathAnchorNormal as Vector3 | undefined
-      const blockedByDirtPath =
-        pathAnchorNormal != null && isGrassPatchBlockedByDirtPath(pathAnchorNormal, input.dayCount)
-      patch.visible = i < totalVisibleGrassPatchCount && !blockedByDirtPath
+      const blockedByWoodPlank =
+        pathAnchorNormal != null && isGrassPatchBlockedByWoodPlankPath(pathAnchorNormal, input.dayCount)
+      patch.visible = i < totalVisibleGrassPatchCount && !blockedByWoodPlank
       if (unifiedGrassPatchScale != null) {
         patch.scale.setScalar(unifiedGrassPatchScale)
       }
-    }
-    if (input.stageIndex === 3 && Math.floor(input.dayCount) >= 14 && Math.floor(input.dayCount) <= 17) {
-      const blockedGrassPatchCount = this.grassPatches.filter((patch) => {
-        const pathAnchorNormal = patch.userData.pathAnchorNormal as Vector3 | undefined
-        return pathAnchorNormal != null && isGrassPatchBlockedByDirtPath(pathAnchorNormal, input.dayCount)
-      }).length
-      // #region debug-point C:grass-clearance
-      fetch('http://127.0.0.1:7777/event', {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionId: 'path-not-visible',
-          runId: 'pre-fix',
-          hypothesisId: 'C',
-          location: 'VegetationLayer.ts:update',
-          msg: '[DEBUG] 草簇清障统计',
-          data: {
-            dayCount: Math.floor(input.dayCount),
-            totalGrassPatchCount: this.grassPatches.length,
-            visibleGrassPatchCount: this.grassPatches.filter((patch) => patch.visible).length,
-            blockedGrassPatchCount,
-          },
-          ts: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
     }
 
     const visibleBushCount =

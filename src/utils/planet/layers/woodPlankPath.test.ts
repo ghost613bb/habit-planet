@@ -4,14 +4,23 @@ import { describe, expect, it } from 'vitest'
 import { DIRT_PATH_CENTER, getDirtPathDirectionAt } from './dirtPath'
 import {
   createWoodPlankPathGroup,
+  getWoodPlankSurfaceNormal,
   getWoodPlankPlacementProgress,
   getWoodPlankPathRevealState,
+  isGrassPatchBlockedByWoodPlankPath,
 } from './woodPlankPath'
 
 function getPerpendicularRouteDirection(progress: number) {
   return getDirtPathDirectionAt(progress)
     .clone()
     .applyAxisAngle(DIRT_PATH_CENTER.clone().normalize(), Math.PI / 2)
+    .normalize()
+}
+
+function getNearbyGrassNormal(index: number, offsetAngle: number) {
+  return getWoodPlankSurfaceNormal(index)
+    .clone()
+    .applyAxisAngle(DIRT_PATH_CENTER.clone().normalize(), offsetAngle)
     .normalize()
 }
 
@@ -33,6 +42,26 @@ describe('第三阶段木板小路显现规则', () => {
       visible: true,
       visiblePlankCount: 4,
     })
+  })
+
+  it('草簇只会被当天已显示木板的占地范围阻挡', () => {
+    expect(isGrassPatchBlockedByWoodPlankPath(getWoodPlankSurfaceNormal(0), 15)).toBe(false)
+    expect(isGrassPatchBlockedByWoodPlankPath(getWoodPlankSurfaceNormal(3), 15)).toBe(true)
+
+    expect(isGrassPatchBlockedByWoodPlankPath(getWoodPlankSurfaceNormal(1), 16)).toBe(true)
+    expect(isGrassPatchBlockedByWoodPlankPath(getWoodPlankSurfaceNormal(0), 16)).toBe(false)
+
+    expect(isGrassPatchBlockedByWoodPlankPath(getWoodPlankSurfaceNormal(0), 17)).toBe(true)
+    expect(isGrassPatchBlockedByWoodPlankPath(new Vector3().setFromSphericalCoords(1, 1.2, 4.8), 17)).toBe(
+      false,
+    )
+  })
+
+  it('木板边缘附近的草簇也会被清掉，避免木板被草遮住', () => {
+    expect(isGrassPatchBlockedByWoodPlankPath(getNearbyGrassNormal(3, 0.095), 15)).toBe(true)
+    expect(isGrassPatchBlockedByWoodPlankPath(new Vector3().setFromSphericalCoords(1, 1.2, 4.8), 15)).toBe(
+      false,
+    )
   })
 })
 
