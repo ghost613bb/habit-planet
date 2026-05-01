@@ -77,4 +77,62 @@ describe('阶段 3 早期（第 11-14 天）', () => {
     expect(flowerBushes.filter((item) => item.visible).length).toBe(4)
     expect(trees.filter((item) => item.visible).length).toBe(3)
   })
+
+  it('第 22-45 天继续保留第 21 天的草簇、树与花丛', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    await vegetationLayer.preload()
+
+    const getVisibleCounts = () => {
+      const bushes = (vegetationLayer as any).bushes as Object3D[]
+      const trees = (vegetationLayer as any).trees as Object3D[]
+      const grassPatches = (vegetationLayer as any).grassPatches as Object3D[]
+      const flowerBushes = (vegetationLayer as any).flowerBushes as Object3D[]
+
+      return {
+        bushCount: bushes.filter((item) => item.visible).length,
+        treeCount: trees.filter((item) => item.visible).length,
+        grassPatchCount: grassPatches.filter((item) => item.visible).length,
+        flowerBushCount: flowerBushes.filter((item) => item.visible).length,
+      }
+    }
+
+    vegetationLayer.update({
+      dayCount: 21,
+      stageIndex: 3 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const dayTwentyOneCounts = getVisibleCounts()
+
+    vegetationLayer.update({
+      dayCount: 22,
+      stageIndex: 4 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+    const dayTwentyTwoCounts = getVisibleCounts()
+
+    vegetationLayer.update({
+      dayCount: 45,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const dayFortyFiveCounts = getVisibleCounts()
+
+    expect(dayTwentyOneCounts).toEqual({
+      bushCount: 4,
+      treeCount: 3,
+      grassPatchCount: dayTwentyOneCounts.grassPatchCount,
+      flowerBushCount: 4,
+    })
+    expect(dayTwentyTwoCounts).toEqual(dayTwentyOneCounts)
+    expect(dayFortyFiveCounts).toEqual(dayTwentyOneCounts)
+    expect((vegetationLayer as any).group.visible).toBe(true)
+  })
 })

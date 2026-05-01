@@ -39,6 +39,8 @@ const TENT_GRASS_CLEARANCE_ANGLE = 0.24
 const TENT_RIGHT_GRASS_OFFSET = 0.14
 const WOODEN_FENCE_MODEL_TARGET_HEIGHT = 0.58
 const WOODEN_FENCE_SURFACE_CLEARANCE = 0.02
+const STAGE_THREE_END_STATE_START_DAY = 22
+const STAGE_THREE_END_STATE_END_DAY = 45
 
 function getTentPlacementData(planetRadius: number) {
   const plankIndex = getFirstRevealedWoodPlankIndex()
@@ -248,6 +250,9 @@ export class StructureLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
+    const shouldHoldStageThreeEndState = this.shouldHoldStageThreeEndState(input)
+    const shouldShowStageFourStructures = input.stageIndex >= 4 && !shouldHoldStageThreeEndState
+
     if (input.stageIndex >= 2) {
       // 真实运行链路不会主动预加载，这里在第一次需要展示篝火时懒加载一次。
       void this.ensureCampfireTemplate()
@@ -270,18 +275,27 @@ export class StructureLayer implements LayerController {
       if (!woodenFence) continue
       woodenFence.visible = i < visibleWoodenFenceCount
     }
-    this.hutFull.visible = input.stageIndex >= 4
-    this.windmill.visible = input.stageIndex >= 4
+    this.hutFull.visible = shouldShowStageFourStructures
+    this.windmill.visible = shouldShowStageFourStructures
     this.bench.visible = input.stageIndex >= 5
     this.swing.visible = input.stageIndex >= 5
 
     this.campfire.scale.setScalar(
       (input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1) * CAMPFIRE_MODEL_SCALE_FACTOR,
     )
-    this.windmillRotor.rotation.z = input.stageIndex >= 4 ? input.dayCount * 0.12 : 0
-    this.hutFull.scale.setScalar(input.stageIndex >= 4 ? 0.95 + input.stageProgress * 0.05 : 1)
+    this.windmillRotor.rotation.z = shouldShowStageFourStructures ? input.dayCount * 0.12 : 0
+    this.hutFull.scale.setScalar(
+      shouldShowStageFourStructures ? 0.95 + input.stageProgress * 0.05 : 1,
+    )
     this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
     this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
+  }
+
+  private shouldHoldStageThreeEndState(input: LayerUpdateInput) {
+    return (
+      input.dayCount >= STAGE_THREE_END_STATE_START_DAY &&
+      input.dayCount <= STAGE_THREE_END_STATE_END_DAY
+    )
   }
 
   private shouldShowTent(input: LayerUpdateInput) {

@@ -67,11 +67,13 @@ export class TerrainLayer implements LayerController {
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoTerrainTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).terrain : null
     const inheritedTerrainTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).terrain : null
+    const woodPlankRevealDay =
+      input.stageIndex === 3 ? input.dayCount : input.stageIndex === 4 ? 21 : input.stageIndex >= 5 ? input.dayCount : null
     const scaleByStage = {
       1: 0.2 + input.stageProgress * 0.25,
       2: 0.48 + input.stageProgress * 0.18,
       3: 0.68,
-      4: 0.8,
+      4: 0.68,
       5: 0.9,
       6: 1,
     }
@@ -117,8 +119,8 @@ export class TerrainLayer implements LayerController {
         (input.stageIndex >= 5 ? '#86a95d' : input.stageIndex >= 3 ? '#7e9460' : '#6b7045'),
     )
 
-    if (input.stageIndex >= 3) {
-      const woodPlankReveal = getWoodPlankPathRevealState(input.dayCount)
+    if (woodPlankRevealDay != null) {
+      const woodPlankReveal = getWoodPlankPathRevealState(woodPlankRevealDay)
       this.woodPlankPath.visible = woodPlankReveal.visible
       const firstVisibleIndex = Math.max(0, woodPlanks.length - woodPlankReveal.visiblePlankCount)
       woodPlanks.forEach((plank, index) => {

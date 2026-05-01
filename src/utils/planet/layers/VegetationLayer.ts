@@ -154,15 +154,13 @@ export class VegetationLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
-    const isLegacyStage = input.stageIndex >= 4
-    this.group.visible = !isLegacyStage
-
-    if (isLegacyStage) return
+    // 植被从第三阶段开始按“逐日累积”继承到后续阶段，不在第 4 阶段后整体隐藏。
+    this.group.visible = true
 
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).vegetation : null
-    const stageThreeTuning = input.stageIndex === 3 ? getStageThreeDayTuning(input.dayCount) : null
-    const persistedStageTwoTuning = stageThreeTuning != null ? getStageTwoDayTuning(10).vegetation : null
+    const stageThreeTuning = input.stageIndex >= 3 ? getStageThreeDayTuning(input.dayCount) : null
+    const persistedStageTwoTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).vegetation : null
     const inheritedVegetationTuning = stageTwoTuning ?? persistedStageTwoTuning
 
     this.sprout.visible = input.stageIndex === 1

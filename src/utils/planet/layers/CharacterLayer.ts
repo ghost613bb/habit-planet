@@ -14,6 +14,9 @@ type CharacterLayerOptions = {
   planetRadius: number
 }
 
+const STAGE_THREE_END_STATE_START_DAY = 22
+const STAGE_THREE_END_STATE_END_DAY = 45
+
 export class CharacterLayer implements LayerController {
   id = 'character'
 
@@ -50,11 +53,17 @@ export class CharacterLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
-    this.rabbit.visible = input.stageIndex >= 4
+    const shouldHoldStageThreeEndState =
+      input.dayCount >= STAGE_THREE_END_STATE_START_DAY &&
+      input.dayCount <= STAGE_THREE_END_STATE_END_DAY
+
+    this.rabbit.visible = input.stageIndex >= 4 && !shouldHoldStageThreeEndState
     this.deer.visible = input.stageIndex >= 6 && input.qualityTier !== 'tier-0'
 
-    const showBirds = input.stageIndex >= 5 && input.qualityTier !== 'tier-0'
-    const showButterflies = input.stageIndex >= 5 && input.qualityTier === 'tier-2'
+    const showBirds =
+      input.stageIndex >= 5 && input.qualityTier !== 'tier-0' && !shouldHoldStageThreeEndState
+    const showButterflies =
+      input.stageIndex >= 5 && input.qualityTier === 'tier-2' && !shouldHoldStageThreeEndState
 
     this.birds.forEach((item) => {
       item.visible = showBirds

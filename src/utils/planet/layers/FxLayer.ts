@@ -17,6 +17,9 @@ import {
 } from './campfirePlacement'
 import type { LayerController, LayerUpdateInput } from './contracts'
 
+const CAMPFIRE_ONLY_START_DAY = 22
+const CAMPFIRE_ONLY_END_DAY = 45
+
 type FxLayerOptions = {
   parentGroup: Group
   planetRadius: number
@@ -65,6 +68,12 @@ export class FxLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
+    const shouldKeepCampfireOnly =
+      input.dayCount >= CAMPFIRE_ONLY_START_DAY && input.dayCount <= CAMPFIRE_ONLY_END_DAY
+    const shouldShowWindowGlow = input.stageIndex >= 4 && !shouldKeepCampfireOnly
+    const shouldShowOrbitRing = input.stageIndex >= 4 && !shouldKeepCampfireOnly
+    const shouldShowOrbitRingOuter = input.stageIndex >= 5 && !shouldKeepCampfireOnly
+
     this.campfireLight.visible = input.stageIndex >= 2
     this.campfireLight.intensity = input.stageIndex >= 2 ? 0.9 + input.stageProgress * 0.9 : 0
     this.campfireGlow.visible = input.stageIndex >= 2
@@ -73,17 +82,17 @@ export class FxLayer implements LayerController {
       input.stageIndex >= 2 ? 0.28 + input.stageProgress * 0.16 : 0,
     )
 
-    this.windowGlow.visible = input.stageIndex >= 4
+    this.windowGlow.visible = shouldShowWindowGlow
     this.setRingOpacity(
       this.windowGlow,
-      input.stageIndex >= 4 ? 0.2 + input.stageProgress * 0.25 : 0,
+      shouldShowWindowGlow ? 0.2 + input.stageProgress * 0.25 : 0,
     )
 
-    this.orbitRing.visible = input.stageIndex >= 4
-    this.orbitRingOuter.visible = input.stageIndex >= 5
+    this.orbitRing.visible = shouldShowOrbitRing
+    this.orbitRingOuter.visible = shouldShowOrbitRingOuter
     this.setRingOpacity(
       this.orbitRing,
-      input.stageIndex >= 4
+      shouldShowOrbitRing
         ? input.qualityTier === 'tier-0'
           ? 0.18
           : 0.3
@@ -91,7 +100,7 @@ export class FxLayer implements LayerController {
     )
     this.setRingOpacity(
       this.orbitRingOuter,
-      input.stageIndex >= 5
+      shouldShowOrbitRingOuter
         ? input.qualityTier === 'tier-0'
           ? 0.12
           : 0.24

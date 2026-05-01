@@ -76,9 +76,11 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(tent.visible).toBe(true)
   })
 
-  it('第 19-21 天会在树外侧逐日累加栅栏，并在后续阶段保留', () => {
+  it('第 19-21 天会在树外侧逐日累加栅栏，并在 22-45 天保留第 21 天末态', () => {
     const layer = createLayer()
     const woodenFences = (layer as any).woodenFences as Group[]
+    const hutFull = (layer as any).hutFull as Group
+    const windmill = (layer as any).windmill as Group
 
     layer.update({
       dayCount: 18,
@@ -113,11 +115,43 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(woodenFences.filter((item) => item.visible)).toHaveLength(4)
 
     layer.update({
-      dayCount: 23,
+      dayCount: 22,
       stageIndex: 4 as const,
-      stageProgress: 0.2,
+      stageProgress: 0,
       qualityTier: 'tier-1' as const,
     })
     expect(woodenFences.filter((item) => item.visible)).toHaveLength(4)
+    expect(hutFull.visible).toBe(false)
+    expect(windmill.visible).toBe(false)
+
+    layer.update({
+      dayCount: 45,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(woodenFences.filter((item) => item.visible)).toHaveLength(4)
+    expect(hutFull.visible).toBe(false)
+    expect(windmill.visible).toBe(false)
+  })
+
+  it('第 46 天起恢复后续结构展示逻辑', () => {
+    const layer = createLayer()
+    const hutFull = (layer as any).hutFull as Group
+    const windmill = (layer as any).windmill as Group
+    const bench = (layer as any).bench as Group
+    const swing = (layer as any).swing as Group
+
+    layer.update({
+      dayCount: 46,
+      stageIndex: 5 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+
+    expect(hutFull.visible).toBe(true)
+    expect(windmill.visible).toBe(true)
+    expect(bench.visible).toBe(true)
+    expect(swing.visible).toBe(true)
   })
 })

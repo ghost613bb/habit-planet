@@ -18,10 +18,13 @@ describe('第三阶段木板小路图层集成', () => {
     })
   }
 
-  it('第 14 天不显示，第 15-17 天逐步出现，第 18 天后继续保留', () => {
+  it('第 22-45 天继承第 21 天末态，第 46 天后继续走后续阶段逻辑', () => {
     const terrainLayer = createLayer()
     const woodPlankPath = (terrainLayer as any).woodPlankPath as Group
     const woodPlanks = woodPlankPath.children as Group[]
+    const grassMesh = (terrainLayer as any).grassMesh as Mesh
+    const getVisibleWoodPlankNames = () => woodPlanks.filter((plank) => plank.visible).map((plank) => plank.name)
+    const getGrassScale = () => Number(grassMesh.scale.x.toFixed(2))
 
     terrainLayer.update({
       dayCount: 14,
@@ -30,7 +33,7 @@ describe('第三阶段木板小路图层集成', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(woodPlankPath.visible).toBe(false)
-    expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(0)
+    expect(getVisibleWoodPlankNames()).toEqual([])
 
     terrainLayer.update({
       dayCount: 15,
@@ -39,8 +42,7 @@ describe('第三阶段木板小路图层集成', () => {
       qualityTier: 'tier-1' as const,
     })
     expect(woodPlankPath.visible).toBe(true)
-    expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(1)
-    expect(woodPlanks.filter((plank) => plank.visible).map((plank) => plank.name)).toEqual(['wood-plank-4'])
+    expect(getVisibleWoodPlankNames()).toEqual(['wood-plank-4'])
 
     terrainLayer.update({
       dayCount: 16,
@@ -48,20 +50,21 @@ describe('第三阶段木板小路图层集成', () => {
       stageProgress: 0.6,
       qualityTier: 'tier-1' as const,
     })
-    expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(3)
-    expect(woodPlanks.filter((plank) => plank.visible).map((plank) => plank.name)).toEqual([
+    expect(getVisibleWoodPlankNames()).toEqual(['wood-plank-2', 'wood-plank-3', 'wood-plank-4'])
+
+    terrainLayer.update({
+      dayCount: 21,
+      stageIndex: 3 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getGrassScale()).toBe(0.68)
+    expect(getVisibleWoodPlankNames()).toEqual([
+      'wood-plank-1',
       'wood-plank-2',
       'wood-plank-3',
       'wood-plank-4',
     ])
-
-    terrainLayer.update({
-      dayCount: 17,
-      stageIndex: 3 as const,
-      stageProgress: 0.7,
-      qualityTier: 'tier-1' as const,
-    })
-    expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(4)
 
     terrainLayer.update({
       dayCount: 22,
@@ -69,7 +72,41 @@ describe('第三阶段木板小路图层集成', () => {
       stageProgress: 0,
       qualityTier: 'tier-1' as const,
     })
-    expect(woodPlanks.filter((plank) => plank.visible)).toHaveLength(4)
+    expect(getGrassScale()).toBe(0.68)
+    expect(getVisibleWoodPlankNames()).toEqual([
+      'wood-plank-1',
+      'wood-plank-2',
+      'wood-plank-3',
+      'wood-plank-4',
+    ])
+
+    terrainLayer.update({
+      dayCount: 45,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getGrassScale()).toBe(0.68)
+    expect(getVisibleWoodPlankNames()).toEqual([
+      'wood-plank-1',
+      'wood-plank-2',
+      'wood-plank-3',
+      'wood-plank-4',
+    ])
+
+    terrainLayer.update({
+      dayCount: 46,
+      stageIndex: 5 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getGrassScale()).toBe(0.9)
+    expect(getVisibleWoodPlankNames()).toEqual([
+      'wood-plank-1',
+      'wood-plank-2',
+      'wood-plank-3',
+      'wood-plank-4',
+    ])
   })
 
   it('第二阶段不显示木板小路，deactivate 会隐藏木板小路', () => {
