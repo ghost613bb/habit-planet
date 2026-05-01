@@ -29,6 +29,7 @@ const WOOD_PLANK_SURFACE_CLEARANCE = 0.032
 const WOOD_PLANK_ROUTE_ROTATION_AXIS = DIRT_PATH_CENTER.clone().normalize()
 const WOOD_PLANK_ROUTE_PERPENDICULAR_ANGLE = Math.PI / 2
 const WOOD_PLANK_GRASS_CLEARANCE_ANGLE = 0.11
+const WOOD_PLANK_TANGENT_SAMPLE_DELTA = 0.01
 
 const WOOD_PLANK_PLACEMENTS: WoodPlankPlacement[] = [
   { progress: 0.2, yawOffset: -0.08, tiltX: 0.03, tiltZ: -0.01, scale: new Vector3(0.96, 1, 1) },
@@ -98,6 +99,10 @@ function getPerpendicularRouteDirection(progress: number) {
     .normalize()
 }
 
+function getWoodPlankPlacement(index: number) {
+  return WOOD_PLANK_PLACEMENTS[MathUtils.clamp(index, 0, WOOD_PLANK_PLACEMENTS.length - 1)]!
+}
+
 function getFirstVisibleWoodPlankIndex(dayCount: number) {
   const revealState = getWoodPlankPathRevealState(dayCount)
   if (!revealState.visible) return WOOD_PLANK_PLACEMENTS.length
@@ -116,10 +121,20 @@ export function getWoodPlankPathRevealState(dayCount: number): WoodPlankPathReve
 }
 
 export function getWoodPlankSurfaceNormal(index: number) {
-  const placement =
-    WOOD_PLANK_PLACEMENTS[MathUtils.clamp(index, 0, WOOD_PLANK_PLACEMENTS.length - 1)]
+  return getPerpendicularRouteDirection(getWoodPlankPlacement(index).progress)
+}
 
-  return getPerpendicularRouteDirection(placement!.progress)
+export function getFirstRevealedWoodPlankIndex() {
+  return WOOD_PLANK_PLACEMENTS.length - 1
+}
+
+export function getWoodPlankPathTangent(index: number) {
+  const progress = getWoodPlankPlacement(index).progress
+  const plankNormal = getWoodPlankSurfaceNormal(index)
+  const prevNormal = getPerpendicularRouteDirection(Math.max(0, progress - WOOD_PLANK_TANGENT_SAMPLE_DELTA))
+  const nextNormal = getPerpendicularRouteDirection(Math.min(1, progress + WOOD_PLANK_TANGENT_SAMPLE_DELTA))
+
+  return nextNormal.clone().sub(prevNormal).projectOnPlane(plankNormal).normalize()
 }
 
 export function isGrassPatchBlockedByWoodPlankPath(normal: Vector3, dayCount: number) {
@@ -162,5 +177,5 @@ export function createWoodPlankPathGroup(planetRadius: number): Group {
 }
 
 export function getWoodPlankPlacementProgress(index: number) {
-  return WOOD_PLANK_PLACEMENTS[MathUtils.clamp(index, 0, WOOD_PLANK_PLACEMENTS.length - 1)]!.progress
+  return getWoodPlankPlacement(index).progress
 }

@@ -10,7 +10,7 @@ import {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
-import { getSurfaceTransform } from '../math/PlanetMath'
+import { getSurfaceTransform, getSurfaceTransformWithClearance } from '../math/PlanetMath'
 import {
   CAMPFIRE_MODEL_TARGET_HEIGHT,
   CAMPFIRE_MODEL_YAW,
@@ -19,6 +19,11 @@ import {
   CAMPFIRE_SURFACE_THETA,
 } from './campfirePlacement'
 import type { LayerController, LayerUpdateInput } from './contracts'
+import {
+  getFirstRevealedWoodPlankIndex,
+  getWoodPlankPathTangent,
+  getWoodPlankSurfaceNormal,
+} from './woodPlankPath'
 
 type StructureLayerOptions = {
   parentGroup: Group
@@ -26,6 +31,10 @@ type StructureLayerOptions = {
 }
 
 const CAMPFIRE_MODEL_SCALE_FACTOR = 0.95
+const TENT_MODEL_TARGET_HEIGHT = 0.7
+const TENT_SURFACE_CLEARANCE = 0.018
+const TENT_PATH_BACK_OFFSET = -0.45
+const TENT_SIDE_OFFSET = 0.12
 
 export class StructureLayer implements LayerController {
   id = 'structure'
@@ -37,6 +46,10 @@ export class StructureLayer implements LayerController {
   private campfireTemplate: Group | null = null
   private campfireLoader = new GLTFLoader(new LoadingManager())
   private campfireLoadPromise: Promise<void> | null = null
+  private tent: Group
+  private tentTemplate: Group | null = null
+  private tentLoader = new GLTFLoader(new LoadingManager())
+  private tentLoadPromise: Promise<void> | null = null
   private hutFull: Group
   private windmill: Group
   private windmillRotor: Group
@@ -50,6 +63,7 @@ export class StructureLayer implements LayerController {
     this.parentGroup.add(this.group)
 
     this.campfire = this.createCampfire()
+    this.tent = this.createTent()
     this.hutFull = this.createHutFull()
     this.windmill = this.createWindmill()
     this.windmillRotor = this.windmill.children[1] as Group
@@ -58,6 +72,7 @@ export class StructureLayer implements LayerController {
 
     this.group.add(
       this.campfire,
+      this.tent,
       this.hutFull,
       this.windmill,
       this.bench,
@@ -66,6 +81,10 @@ export class StructureLayer implements LayerController {
   }
 
   preload(): Promise<void> {
+    return Promise.all([this.ensureCampfireTemplate(), this.ensureTentTemplate()]).then(() => undefined)
+  }
+
+  private ensureCampfireTemplate(): Promise<void> {
     const isJsdomEnvironment =
       typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
 
@@ -102,6 +121,43 @@ export class StructureLayer implements LayerController {
     return this.campfireLoadPromise
   }
 
+  private ensureTentTemplate(): Promise<void> {
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.tentLoadPromise) {
+        this.tentTemplate = new Group()
+        this.attachTentInstance()
+        this.tentLoadPromise = Promise.resolve()
+      }
+
+      return this.tentLoadPromise
+    }
+
+    if (!this.tentLoadPromise) {
+      const tentUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/low-poly_tent/scene.gltf', globalThis.location.origin).toString()
+          : '/models/low-poly_tent/scene.gltf'
+
+      this.tentLoadPromise = new Promise((resolve, reject) => {
+        this.tentLoader.load(
+          tentUrl,
+          (gltf) => {
+            this.tentTemplate = gltf.scene.clone(true)
+            this.attachTentInstance()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.tentLoadPromise
+  }
+
   activate(input: LayerUpdateInput) {
     this.update(input)
   }
@@ -109,10 +165,16 @@ export class StructureLayer implements LayerController {
   update(input: LayerUpdateInput) {
     if (input.stageIndex >= 2) {
       // 真实运行链路不会主动预加载，这里在第一次需要展示篝火时懒加载一次。
-      void this.preload()
+      void this.ensureCampfireTemplate()
+    }
+
+    if (this.shouldShowTent(input)) {
+      // 第 18 天帐篷第一次出现时再懒加载，避免第三阶段前半段白白加载模型。
+      void this.ensureTentTemplate()
     }
 
     this.campfire.visible = input.stageIndex >= 2
+    this.tent.visible = this.shouldShowTent(input)
     this.hutFull.visible = input.stageIndex >= 4
     this.windmill.visible = input.stageIndex >= 4
     this.bench.visible = input.stageIndex >= 5
@@ -125,6 +187,10 @@ export class StructureLayer implements LayerController {
     this.hutFull.scale.setScalar(input.stageIndex >= 4 ? 0.95 + input.stageProgress * 0.05 : 1)
     this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
     this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
+  }
+
+  private shouldShowTent(input: LayerUpdateInput) {
+    return input.dayCount >= 18 && input.stageIndex >= 3
   }
 
   deactivate() {
@@ -164,6 +230,65 @@ export class StructureLayer implements LayerController {
     instance.rotation.y = CAMPFIRE_MODEL_YAW
 
     this.campfire.add(instance)
+  }
+
+  private createTent() {
+    const group = new Group()
+    const plankIndex = getFirstRevealedWoodPlankIndex()
+    const plankNormal = getWoodPlankSurfaceNormal(plankIndex)
+    const pathTangent = getWoodPlankPathTangent(plankIndex)
+    const { pos: plankSurfacePos } = getSurfaceTransformWithClearance(plankNormal, this.planetRadius)
+    const leftDirection = plankNormal.clone().cross(pathTangent).normalize()
+    const tentAnchorPos = plankSurfacePos
+      .clone()
+      .addScaledVector(pathTangent, -TENT_PATH_BACK_OFFSET)
+      .addScaledVector(leftDirection, TENT_SIDE_OFFSET)
+    const tentNormal = tentAnchorPos.normalize()
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      tentNormal,
+      this.planetRadius,
+      TENT_SURFACE_CLEARANCE,
+    )
+
+    group.position.copy(pos)
+    group.quaternion.copy(quaternion)
+    this.alignTentFacing(group, surfaceNormal, plankNormal)
+    group.visible = false
+
+    return group
+  }
+
+  private alignTentFacing(group: Group, surfaceNormal: Vector3, targetNormal: Vector3) {
+    const facingTarget = targetNormal.clone().projectOnPlane(surfaceNormal)
+    if (facingTarget.lengthSq() <= 1e-6) return
+
+    facingTarget.normalize()
+    const currentFacing = new Vector3(0, 0, 1).applyQuaternion(group.quaternion).projectOnPlane(surfaceNormal)
+    if (currentFacing.lengthSq() <= 1e-6) return
+
+    currentFacing.normalize()
+    const angle = Math.atan2(
+      currentFacing.clone().cross(facingTarget).dot(surfaceNormal),
+      currentFacing.dot(facingTarget),
+    )
+    group.rotateY(angle)
+  }
+
+  private attachTentInstance() {
+    this.tent.clear()
+    if (!this.tentTemplate) return
+
+    const instance = this.tentTemplate.clone(true)
+    const bounds = new Box3().setFromObject(instance)
+    const size = bounds.getSize(new Vector3())
+    const center = bounds.getCenter(new Vector3())
+    const safeHeight = Math.max(size.y, 0.001)
+    const scale = TENT_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.scale.setScalar(scale)
+    instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
+
+    this.tent.add(instance)
   }
 
   private createHutFull() {
