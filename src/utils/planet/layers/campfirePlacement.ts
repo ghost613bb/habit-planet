@@ -1,5 +1,5 @@
-export const CAMPFIRE_SURFACE_PHI = 0.36
-export const CAMPFIRE_SURFACE_THETA = 0.42
+export const CAMPFIRE_SURFACE_PHI = 0.26
+export const CAMPFIRE_SURFACE_THETA = 0.92
 
 // 模型本体略贴地一些，火光再稍微抬高，整体会更稳。
 export const CAMPFIRE_STRUCTURE_RADIUS_OFFSET = 0.015
