@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low Poly Flowers
+* source:	https://sketchfab.com/3d-models/low-poly-flowers-b74c6eee48844ac395de267d373d73c1
+* author:	InnocentBaraka (https://sketchfab.com/InnocentBaraka)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low Poly Flowers" (https://sketchfab.com/3d-models/low-poly-flowers-b74c6eee48844ac395de267d373d73c1) by InnocentBaraka (https://sketchfab.com/InnocentBaraka) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
