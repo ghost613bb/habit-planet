@@ -1,10 +1,13 @@
 import {
   Box3,
   BoxGeometry,
+  Color,
   CylinderGeometry,
   Group,
   LoadingManager,
   Mesh,
+  MeshLambertMaterial,
+  MeshStandardMaterial,
   Vector3,
 } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -31,6 +34,8 @@ type StructureLayerOptions = {
   planetRadius: number
 }
 
+type CabinWindowMaterial = MeshLambertMaterial | MeshStandardMaterial
+
 const CAMPFIRE_MODEL_SCALE_FACTOR = 0.95
 const TENT_MODEL_TARGET_HEIGHT = 0.7
 const TENT_SURFACE_CLEARANCE = 0.018
@@ -49,7 +54,7 @@ const CABIN_INSTANCE_SINK_OFFSET = 0.45
 const CABIN_SURFACE_CLEARANCE_BASELINE =
   getStageFourCabinDayTuning(CABIN_TRANSITION_START_DAY).surfaceClearance
 
-function getTentPlacementData(planetRadius: number) {
+export function getCabinPlacementData(planetRadius: number) {
   const plankIndex = getFirstRevealedWoodPlankIndex()
   const plankNormal = getWoodPlankSurfaceNormal(plankIndex)
   const pathTangent = getWoodPlankPathTangent(plankIndex)
@@ -82,7 +87,7 @@ export function isGrassPatchBlockedByTent(normal: Vector3, dayCount: number, pla
   if (dayCount < 18) return false
 
   const safeNormal = normal.clone().normalize()
-  const { leftDirection, tentSurfaceNormal } = getTentPlacementData(planetRadius)
+  const { leftDirection, tentSurfaceNormal } = getCabinPlacementData(planetRadius)
   const rightTentSurfaceNormal = tentSurfaceNormal
     .clone()
     .addScaledVector(leftDirection, -TENT_RIGHT_GRASS_OFFSET)
@@ -115,6 +120,7 @@ export class StructureLayer implements LayerController {
   private woodenFenceLoader = new GLTFLoader(new LoadingManager())
   private woodenFenceLoadPromise: Promise<void> | null = null
   private woodenFences: Group[] = []
+  private cabinWindowMaterials: CabinWindowMaterial[] = []
   private hutFull: Group
   private windmill: Group
   private windmillRotor: Group
@@ -237,8 +243,14 @@ export class StructureLayer implements LayerController {
     if (isJsdomEnvironment) {
       if (!this.cabinLoadPromise) {
         const mockCabinTemplate = new Group()
-        // 测试环境里补一个最小占位体，保证包围盒与缩放逻辑可验证。
-        mockCabinTemplate.add(new Mesh(new BoxGeometry(1, 1, 1), mats.houseBody))
+        // 测试环境里补一个最小占位体，保证包围盒、缩放与窗材逻辑都可验证。
+        const body = new Mesh(new BoxGeometry(1, 1, 1), mats.houseBody)
+        const window = new Mesh(
+          new BoxGeometry(0.3, 0.25, 0.02),
+          new MeshStandardMaterial({ color: '#00d7ff' }),
+        )
+        window.position.set(0, 0.15, 0.51)
+        mockCabinTemplate.add(body, window)
         this.cabinTemplate = mockCabinTemplate
         this.attachCabinInstance()
         this.cabinLoadPromise = Promise.resolve()
@@ -332,7 +344,7 @@ export class StructureLayer implements LayerController {
     if (shouldShowCabin || shouldShowWindmill) {
       // 房屋在第四阶段后半段与第五阶段延续出现，首次需要时再懒加载。
       void this.ensureCabinTemplate()
-      this.updateCabinTransform(cabinDayTuning)
+      this.updateCabinTransform(input.dayCount, cabinDayTuning)
     }
 
     this.campfire.visible = input.stageIndex >= 2
@@ -423,7 +435,7 @@ export class StructureLayer implements LayerController {
 
   private createTent() {
     const group = new Group()
-    const { plankNormal, tentSurfaceNormal } = getTentPlacementData(this.planetRadius)
+    const { plankNormal, tentSurfaceNormal } = getCabinPlacementData(this.planetRadius)
     const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
       tentSurfaceNormal,
       this.planetRadius,
@@ -471,8 +483,47 @@ export class StructureLayer implements LayerController {
     this.tent.add(instance)
   }
 
-  private updateCabinTransform(cabinDayTuning = getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)) {
-    const { plankNormal, tentSurfaceNormal } = getTentPlacementData(this.planetRadius)
+  private getCabinWindowWarmth(dayCount: number) {
+    if (dayCount < CABIN_TRANSITION_START_DAY) return 0
+    if (dayCount <= CABIN_TRANSITION_END_DAY) {
+      return getStageFourCabinDayTuning(dayCount).windowWarmth
+    }
+
+    return getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY).windowWarmth
+  }
+
+  private isSupportedCabinWindowMaterial(
+    material: unknown,
+  ): material is CabinWindowMaterial {
+    return material instanceof MeshLambertMaterial || material instanceof MeshStandardMaterial
+  }
+
+  private isCabinWindowMaterial(material: CabinWindowMaterial) {
+    const color = material.color
+    return color.b > 0.75 && color.g > 0.55 && color.r < 0.2
+  }
+
+  private createCabinWindowGlowMaterial(source: CabinWindowMaterial) {
+    const material = source.clone()
+    material.color = new Color('#8fd7ff')
+    material.emissive = new Color('#ffb25a')
+    material.emissiveIntensity = 0
+
+    return material
+  }
+
+  private syncCabinWindowWarmth(dayCount: number) {
+    const warmth = this.getCabinWindowWarmth(dayCount)
+    this.cabinWindowMaterials.forEach((material) => {
+      material.emissiveIntensity = 0.2 + warmth * 3.2
+    })
+  }
+
+  private updateCabinTransform(
+    dayCount: number,
+    cabinDayTuning = getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY),
+  ) {
+    const { plankNormal, tentSurfaceNormal } = getCabinPlacementData(this.planetRadius)
     const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
       tentSurfaceNormal,
       this.planetRadius,
@@ -484,10 +535,12 @@ export class StructureLayer implements LayerController {
     this.alignFacingToSurfaceTarget(this.hutFull, surfaceNormal, plankNormal)
     this.hutFull.rotateY(cabinDayTuning.yawOffset)
     this.hutFull.scale.setScalar(cabinDayTuning.houseScale)
+    this.syncCabinWindowWarmth(dayCount)
   }
 
   private attachCabinInstance() {
     this.hutFull.clear()
+    this.cabinWindowMaterials = []
     if (!this.cabinTemplate) return
 
     const instance = this.cabinTemplate.clone(true)
@@ -496,6 +549,18 @@ export class StructureLayer implements LayerController {
     const center = bounds.getCenter(new Vector3())
     const safeHeight = Math.max(size.y, 0.001)
     const scale = CABIN_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.traverse((child) => {
+      if (!(child instanceof Mesh)) return
+      const material = child.material
+      if (Array.isArray(material)) return
+      if (!this.isSupportedCabinWindowMaterial(material)) return
+      if (!this.isCabinWindowMaterial(material)) return
+
+      const emissiveMaterial = this.createCabinWindowGlowMaterial(material)
+      child.material = emissiveMaterial
+      this.cabinWindowMaterials.push(emissiveMaterial)
+    })
 
     instance.scale.setScalar(scale)
     instance.position.set(
@@ -555,7 +620,7 @@ export class StructureLayer implements LayerController {
   private createHutFull() {
     const group = new Group()
     const cabinDayTuning = getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)
-    const { plankNormal, tentSurfaceNormal } = getTentPlacementData(this.planetRadius)
+    const { plankNormal, tentSurfaceNormal } = getCabinPlacementData(this.planetRadius)
     const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
       tentSurfaceNormal,
       this.planetRadius,
@@ -566,6 +631,7 @@ export class StructureLayer implements LayerController {
     this.alignFacingToSurfaceTarget(group, surfaceNormal, plankNormal)
     group.rotateY(cabinDayTuning.yawOffset)
     group.scale.setScalar(cabinDayTuning.houseScale)
+    this.syncCabinWindowWarmth(CABIN_TRANSITION_END_DAY)
     group.visible = false
 
     return group

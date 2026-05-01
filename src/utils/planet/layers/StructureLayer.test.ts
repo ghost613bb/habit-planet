@@ -1,4 +1,4 @@
-import { Box3, Group, Vector3 } from 'three'
+import { Box3, Group, Mesh, MeshLambertMaterial, MeshStandardMaterial, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { StructureLayer } from './StructureLayer'
@@ -22,7 +22,47 @@ function getCabinModelHeight(hutFull: Group) {
   return size.y
 }
 
+function isCabinWindowMaterial(
+  material: unknown,
+): material is MeshLambertMaterial | MeshStandardMaterial {
+  return material instanceof MeshLambertMaterial || material instanceof MeshStandardMaterial
+}
+
+function getCabinWindowMaterials(hutFull: Group) {
+  const result: Array<MeshLambertMaterial | MeshStandardMaterial> = []
+
+  hutFull.traverse((child) => {
+    if (!(child instanceof Mesh)) return
+    const material = child.material
+    if (Array.isArray(material)) return
+    if (!isCabinWindowMaterial(material)) return
+    if (material.emissive.getHex() === 0x000000) return
+    result.push(material)
+  })
+
+  return result
+}
+
 describe('结构图层中的第三阶段帐篷', () => {
+  it('房屋实例在第四阶段会挂载暖光窗材，而不是只修改全局材质', async () => {
+    const layer = createLayer()
+    const hutFull = (layer as any).hutFull as Group
+    await layer.preload()
+
+    layer.update({
+      dayCount: 22,
+      stageIndex: 4 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const windowMaterials = getCabinWindowMaterials(hutFull)
+
+    expect(hutFull.children.length).toBeGreaterThan(0)
+    expect(windowMaterials.length).toBeGreaterThan(0)
+    expect(windowMaterials.every((material) => material.emissive.getHex() !== 0x000000)).toBe(true)
+  })
+
   it('第 18 天起显示，并与首块显现木板保持分离', () => {
     const layer = createLayer()
     const tent = (layer as any).tent as Group
@@ -210,6 +250,11 @@ describe('结构图层中的第三阶段帐篷', () => {
       .normalize()
     const day22Radius = day22Position.length()
     const day22CabinModelHeight = getCabinModelHeight(hutFull)
+    const day22WindowMaterials = getCabinWindowMaterials(hutFull)
+    const day22EmissiveIntensity = Math.max(
+      ...day22WindowMaterials.map((item) => item.emissiveIntensity),
+      0,
+    )
 
     layer.update({
       dayCount: 28,
@@ -225,19 +270,43 @@ describe('结构图层中的第三阶段帐篷', () => {
       .normalize()
     const day28Radius = day28Position.length()
     const day28CabinModelHeight = getCabinModelHeight(hutFull)
+    const day28WindowMaterials = getCabinWindowMaterials(hutFull)
+    const day28EmissiveIntensity = Math.max(
+      ...day28WindowMaterials.map((item) => item.emissiveIntensity),
+      0,
+    )
     const movementDelta = day28Position.clone().sub(day22Position)
     const radialDelta = day22SurfaceNormal.clone().multiplyScalar(movementDelta.dot(day22SurfaceNormal))
     const tangentialDelta = movementDelta.clone().sub(radialDelta)
 
     expect(hutFull.children.length).toBeGreaterThan(0)
+    expect(day22WindowMaterials.length).toBeGreaterThan(0)
+    expect(day22EmissiveIntensity).toBeGreaterThan(0)
+    expect(day28WindowMaterials.length).toBeGreaterThan(0)
+    expect(day28EmissiveIntensity).toBeGreaterThan(day22EmissiveIntensity)
     expect(day22Position.distanceTo(day28Position)).toBeLessThan(0.005)
     expect(day22SurfaceNormal.angleTo(day28SurfaceNormal)).toBeLessThan(0.001)
     expect(day28Radius).toBeLessThan(day22Radius)
     expect(tangentialDelta.length()).toBeLessThan(0.001)
-    expect(day22CabinModelHeight).toBeCloseTo(1.92, 2)
-    expect(day28CabinModelHeight).toBeCloseTo(1.92, 2)
+    expect(day22CabinModelHeight).toBeCloseTo(1.5, 2)
+    expect(day28CabinModelHeight).toBeCloseTo(1.5, 2)
     expect(day22Facing.angleTo(day28Facing)).toBeGreaterThan(0.05)
     expect(hutFull.scale.x).toBeCloseTo(1, 5)
+
+    layer.update({
+      dayCount: 45,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const day45WindowMaterials = getCabinWindowMaterials(hutFull)
+    const day45EmissiveIntensity = Math.max(
+      ...day45WindowMaterials.map((item) => item.emissiveIntensity),
+      0,
+    )
+
+    expect(day45WindowMaterials.length).toBeGreaterThan(0)
+    expect(day45EmissiveIntensity).toBeCloseTo(day28EmissiveIntensity, 5)
   })
 
   it('第 46 天起恢复后续结构展示逻辑', async () => {
@@ -251,6 +320,18 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(hutFull.children.length).toBeGreaterThan(0)
 
     layer.update({
+      dayCount: 45,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+    const day45WindowMaterials = getCabinWindowMaterials(hutFull)
+    const day45EmissiveIntensity = Math.max(
+      ...day45WindowMaterials.map((item) => item.emissiveIntensity),
+      0,
+    )
+
+    layer.update({
       dayCount: 46,
       stageIndex: 5 as const,
       stageProgress: 0,
@@ -261,5 +342,9 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(windmill.visible).toBe(true)
     expect(bench.visible).toBe(true)
     expect(swing.visible).toBe(true)
+    expect(getCabinWindowMaterials(hutFull).length).toBeGreaterThan(0)
+    expect(
+      Math.max(...getCabinWindowMaterials(hutFull).map((item) => item.emissiveIntensity), 0),
+    ).toBeCloseTo(day45EmissiveIntensity, 5)
   })
 })
