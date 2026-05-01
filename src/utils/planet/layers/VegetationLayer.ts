@@ -12,15 +12,21 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { mats } from '../assets/Materials'
 import {
+  createLowPolyFlowerInstance,
+  preloadLowPolyFlowerTemplate,
+  type LowPolyFlowerVariant,
+} from '../assets/LowPolyFlowers'
+import {
   createFlowerBushInstance,
   preloadFlowerBushTemplate,
   type FlowerBushPaletteVariant,
 } from '../assets/FlowerBush'
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
 import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
+import { getStageFourFlowerDayTuning } from '../config/stageFourFlowerDayTuning'
 import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
-import { getPlacementTransform } from '../math/PlanetMath'
+import { getPlacementTransform, getSurfaceTransformWithClearance } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
 import { isGrassPatchBlockedByTent } from './StructureLayer'
 import { isGrassPatchBlockedByWoodPlankPath } from './woodPlankPath'
@@ -35,6 +41,13 @@ type BushAnchor = {
   theta: number
 }
 
+type LowPolyFlowerAnchor = {
+  phi: number
+  theta: number
+  scale: number
+  yaw: number
+}
+
 const SPROUT_SCALE_BOOST = 1.55
 const BUSH_SCALE_BOOST = 1.7
 const GRASS_PATCH_SCALE_BOOST = 1.75
@@ -42,6 +55,8 @@ const LEAFY_TREE_SCALE_BOOST = 1.68
 const WIDE_TREE_SCALE_BOOST = 1.58
 const BUSH_MODEL_SCALE_FACTOR = 0.95
 const FLOWER_BUSH_MODEL_SCALE_FACTOR = 0.95
+const LOW_POLY_FLOWER_TARGET_HEIGHT = 0.6
+const LOW_POLY_FLOWER_SURFACE_CLEARANCE = 0.065
 const BUSH_OUTWARD_PHI_OFFSET = 0.09
 const BUSH_BASE_ANCHORS: BushAnchor[] = [
   { phi: 0.42, theta: 1.02 },
@@ -50,6 +65,22 @@ const BUSH_BASE_ANCHORS: BushAnchor[] = [
   // 第 4 颗草球按调试面板确认值固化到默认锚点，避免每次都要手调。
   { phi: 0.32, theta: 5.33 },
   { phi: 0.14, theta: 3.6 },
+]
+const LOW_POLY_FLOWER_BASE_ANCHORS: LowPolyFlowerAnchor[] = [
+  { phi: 0.22, theta: 0.18, scale: 0.94, yaw: 0.16 },
+  { phi: 0.2, theta: 1.58, scale: 0.98, yaw: 0.54 },
+  { phi: 0.18, theta: 2.3, scale: 0.92, yaw: -0.28 },
+  { phi: 0.24, theta: 3.02, scale: 1, yaw: 0.42 },
+  { phi: 0.22, theta: 3.8, scale: 0.96, yaw: -0.14 },
+  { phi: 0.26, theta: 4.54, scale: 0.93, yaw: 0.2 },
+  { phi: 0.24, theta: 5.28, scale: 1.02, yaw: -0.48 },
+  { phi: 0.34, theta: 0.64, scale: 0.97, yaw: 0.18 },
+  { phi: 0.32, theta: 1.98, scale: 1.04, yaw: -0.24 },
+  { phi: 0.36, theta: 2.78, scale: 0.95, yaw: 0.36 },
+  { phi: 0.34, theta: 4.14, scale: 1.01, yaw: -0.32 },
+  { phi: 0.38, theta: 4.96, scale: 0.94, yaw: 0.3 },
+  { phi: 0.46, theta: 1.18, scale: 0.99, yaw: -0.18 },
+  { phi: 0.48, theta: 3.42, scale: 1.03, yaw: 0.28 },
 ]
 
 export class VegetationLayer implements LayerController {
@@ -63,12 +94,14 @@ export class VegetationLayer implements LayerController {
   private trees: Group[] = []
   private grassPatches: Group[] = []
   private flowerBushes: Group[] = []
+  private lowPolyFlowers: Group[] = []
   private grassPatchTemplate: Group | null = null
   private grassPatchLoader = new GLTFLoader(new LoadingManager())
   private grassPatchLoadPromise: Promise<void> | null = null
   private leafyTreeLoadPromise: Promise<void> | null = null
   private lowPolyWideTreeLoadPromise: Promise<void> | null = null
   private flowerBushLoadPromise: Promise<void> | null = null
+  private lowPolyFlowerLoadPromise: Promise<void> | null = null
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -91,6 +124,9 @@ export class VegetationLayer implements LayerController {
 
     this.flowerBushes = this.createFlowerBushAnchors()
     this.flowerBushes.forEach((item) => this.group.add(item))
+
+    this.lowPolyFlowers = this.createLowPolyFlowerAnchors()
+    this.lowPolyFlowers.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
@@ -141,11 +177,18 @@ export class VegetationLayer implements LayerController {
       })
     }
 
+    if (!this.lowPolyFlowerLoadPromise) {
+      this.lowPolyFlowerLoadPromise = preloadLowPolyFlowerTemplate().then(() => {
+        this.attachLowPolyFlowerInstances()
+      })
+    }
+
     return Promise.all([
       this.grassPatchLoadPromise,
       this.leafyTreeLoadPromise,
       this.lowPolyWideTreeLoadPromise,
       this.flowerBushLoadPromise,
+      this.lowPolyFlowerLoadPromise,
     ]).then(() => undefined)
   }
 
@@ -184,8 +227,17 @@ export class VegetationLayer implements LayerController {
     const visibleTreeCount =
       input.stageIndex === 1 ? 0 : stageThreeTuning != null ? 3 : inheritedVegetationTuning?.treeCount ?? 0
     const visibleFlowerBushCount = stageThreeTuning?.flowerBushCount ?? 0
+    const visibleLowPolyFlowerCount =
+      input.stageIndex >= 4 && input.dayCount >= 29
+        ? getStageFourFlowerDayTuning(input.dayCount).lowPolyFlowerCount
+        : 0
 
-    if (totalVisibleGrassPatchCount > 0 || visibleTreeCount > 0 || visibleFlowerBushCount > 0) {
+    if (
+      totalVisibleGrassPatchCount > 0 ||
+      visibleTreeCount > 0 ||
+      visibleFlowerBushCount > 0 ||
+      visibleLowPolyFlowerCount > 0
+    ) {
       // 真实运行链路不会手动调用 preload，这里在草簇或树首次需要显示时懒加载一次。
       void this.preload()
     }
@@ -236,6 +288,12 @@ export class VegetationLayer implements LayerController {
       if (!flowerBush) continue
       flowerBush.visible = i < visibleFlowerBushCount
     }
+
+    for (let i = 0; i < this.lowPolyFlowers.length; i += 1) {
+      const flower = this.lowPolyFlowers[i]
+      if (!flower) continue
+      flower.visible = i < visibleLowPolyFlowerCount
+    }
   }
 
   deactivate() {
@@ -245,6 +303,9 @@ export class VegetationLayer implements LayerController {
     })
     this.flowerBushes.forEach((flowerBush) => {
       flowerBush.visible = false
+    })
+    this.lowPolyFlowers.forEach((flower) => {
+      flower.visible = false
     })
   }
 
@@ -424,6 +485,34 @@ export class VegetationLayer implements LayerController {
     })
   }
 
+  private createLowPolyFlowerAnchors() {
+    return LOW_POLY_FLOWER_BASE_ANCHORS.map((anchor) => {
+      const flower = new Group()
+      const { pos, quaternion } = getSurfaceTransformWithClearance(
+        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+        this.planetRadius,
+        LOW_POLY_FLOWER_SURFACE_CLEARANCE,
+      )
+
+      flower.position.copy(pos)
+      flower.quaternion.copy(quaternion)
+      flower.rotation.y = anchor.yaw
+      flower.visible = false
+
+      return flower
+    })
+  }
+
+  private getDeterministicFlowerUnit(index: number) {
+    const seed = Math.sin((index + 1) * 12.9898 + 78.233) * 43758.5453
+    return seed - Math.floor(seed)
+  }
+
+  private getLowPolyFlowerVariant(index: number): LowPolyFlowerVariant {
+    const variants: LowPolyFlowerVariant[] = ['upright', 'wide', 'lean']
+    return variants[Math.floor(this.getDeterministicFlowerUnit(index) * variants.length)] ?? 'upright'
+  }
+
   private attachGrassPatchInstances() {
     this.grassPatches.forEach((patch, index) => {
       patch.clear()
@@ -476,6 +565,22 @@ export class VegetationLayer implements LayerController {
           targetHeight: 1.02,
           rotationY: index * 0.72,
           paletteVariant: paletteVariants[index % paletteVariants.length],
+        }),
+      )
+    })
+  }
+
+  private attachLowPolyFlowerInstances() {
+    this.lowPolyFlowers.forEach((flower, index) => {
+      const anchor = LOW_POLY_FLOWER_BASE_ANCHORS[index]
+      if (!anchor) return
+
+      flower.clear()
+      flower.add(
+        createLowPolyFlowerInstance({
+          targetHeight: LOW_POLY_FLOWER_TARGET_HEIGHT * anchor.scale,
+          rotationY: anchor.yaw,
+          variant: this.getLowPolyFlowerVariant(index),
         }),
       )
     })
