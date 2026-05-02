@@ -453,7 +453,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(day40Position.distanceTo(day36Position)).toBeLessThan(1e-6)
   })
 
-  it('第 46 天起恢复后续结构展示逻辑', async () => {
+  it('第 65 天起才显示秋千，并保持后续结构展示逻辑', async () => {
     const layer = createLayer()
     const hutFull = (layer as any).hutFull as Group
     const windmill = (layer as any).windmill as Group
@@ -484,9 +484,18 @@ describe('结构图层中的第三阶段帐篷', () => {
 
     expect(hutFull.visible).toBe(true)
     expect(windmill.visible).toBe(true)
+    expect(swing.visible).toBe(false)
+
+    layer.update({
+      dayCount: 65,
+      stageIndex: 5 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+
     expect(swing.visible).toBe(true)
     expect(swing.children.length).toBeGreaterThan(0)
-    expect(getSwingModelHeight(swing)).toBeCloseTo(0.92, 2)
+    expect(getSwingModelHeight(swing)).toBeCloseTo(1.02, 2)
     expect(swing.position.distanceTo(rabbit.position)).toBeGreaterThan(0.2)
     expect(swing.position.distanceTo(rabbit.position)).toBeLessThan(1.2)
     expect(getCabinWindowMaterials(hutFull).length).toBeGreaterThan(0)

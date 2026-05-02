@@ -92,6 +92,7 @@ const RABBIT_FRONT_OFFSET = 0.68
 const RABBIT_LEFT_OFFSET = 0.52
 // 控制水平朝向
 const RABBIT_YAW_OFFSET = -1
+const SWING_APPEAR_START_DAY = 65
 // 控制秋千模型整体大小
 const SWING_MODEL_TARGET_HEIGHT = 1.02
 // 控制秋千离地高度
@@ -680,6 +681,7 @@ export class StructureLayer implements LayerController {
     const shouldShowCabin = this.shouldShowCabin(input)
     const shouldShowWindmill = this.shouldShowWindmill(input)
     const shouldShowRabbit = this.shouldShowRabbit(input)
+    const shouldShowSwing = input.stageIndex >= 5 && input.dayCount >= SWING_APPEAR_START_DAY
     const cabinDayTuning = this.getCabinDayTuning(input.dayCount)
     const cabinVariant = this.getCabinVariant(input.dayCount)
 
@@ -713,8 +715,8 @@ export class StructureLayer implements LayerController {
       void this.ensureRabbitTemplate()
       this.updateRabbitTransform()
     }
-    if (input.stageIndex >= 5) {
-      // 第五阶段开始在兔子旁边接入秋千模型，后续如需替换模型只需要保留这条挂载链路。
+    if (shouldShowSwing) {
+      // 第 65 天起在兔子旁边接入秋千模型，后续如需替换模型只需要保留这条挂载链路。
       void this.ensureSwingTemplate()
       this.updateSwingTransform()
     }
@@ -730,12 +732,12 @@ export class StructureLayer implements LayerController {
     this.hutFull.visible = shouldShowCabin || shouldShowWindmill
     this.rabbit.visible = shouldShowRabbit
     this.windmill.visible = shouldShowWindmill
-    this.swing.visible = input.stageIndex >= 5
+    this.swing.visible = shouldShowSwing
 
     this.campfire.scale.setScalar(
       (input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1) * CAMPFIRE_MODEL_SCALE_FACTOR,
     )
-    this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
+    this.swing.scale.setScalar(shouldShowSwing ? 0.9 + input.stageProgress * 0.1 : 1)
   }
 
   tick(elapsedMs: number) {
