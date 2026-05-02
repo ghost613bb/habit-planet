@@ -1,4 +1,6 @@
 import {
+  AnimationClip,
+  AnimationMixer,
   Box3,
   BoxGeometry,
   Color,
@@ -50,6 +52,24 @@ const CABIN_TRANSITION_START_DAY = 22
 const CABIN_TRANSITION_END_DAY = 28
 const CABIN_STAGE_END_DAY = 45
 const RABBIT_APPEAR_START_DAY = 34
+const WINDMILL_APPEAR_START_DAY = 36
+const WINDMILL_GROWTH_END_DAY = 40
+// 控制风车模型最大高度
+const WINDMILL_MODEL_TARGET_HEIGHT = 1.18
+// 控制第 36 天风车初始缩放
+const WINDMILL_GROWTH_START_SCALE = 1
+// 控制第 40 天风车最终缩放
+const WINDMILL_GROWTH_END_SCALE = 1.8
+// 控制风车离地高度
+const WINDMILL_SURFACE_CLEARANCE = 0.028
+// 控制风车在星球表面的前后位置
+const WINDMILL_SURFACE_PHI = 0.30
+// 控制风车在星球表面的左右位置
+const WINDMILL_SURFACE_THETA = 3.35
+// 控制风车水平朝向
+const WINDMILL_YAW_OFFSET = 2.58
+// 控制风车动画播放速度
+const WINDMILL_ANIMATION_SPEED = 0.9
 // 控制兔子整体大小
 const RABBIT_MODEL_TARGET_HEIGHT = 0.62
 // 控制离地高度
@@ -151,7 +171,11 @@ export class StructureLayer implements LayerController {
   private rabbitLoader = new GLTFLoader(new LoadingManager())
   private rabbitLoadPromise: Promise<void> | null = null
   private windmill: Group
-  private windmillRotor: Group
+  private windmillTemplate: Group | null = null
+  private windmillAnimations: AnimationClip[] = []
+  private windmillMixer: AnimationMixer | null = null
+  private windmillLoader = new GLTFLoader(new LoadingManager())
+  private windmillLoadPromise: Promise<void> | null = null
   private bench: Group
   private swing: Group
 
@@ -167,7 +191,6 @@ export class StructureLayer implements LayerController {
     this.hutFull = this.createHutFull()
     this.rabbit = this.createRabbit()
     this.windmill = this.createWindmill()
-    this.windmillRotor = this.windmill.children[1] as Group
     this.bench = this.createBench()
     this.swing = this.createSwing()
 
@@ -397,13 +420,66 @@ export class StructureLayer implements LayerController {
     return this.rabbitLoadPromise
   }
 
+  private ensureWindmillTemplate(): Promise<void> {
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.windmillLoadPromise) {
+        const mockWindmillTemplate = new Group()
+        const tower = new Mesh(new CylinderGeometry(0.06, 0.09, 1.1, 6), mats.houseBody)
+        tower.position.y = 0.55
+        const rotor = new Group()
+        rotor.position.set(0, 0.92, 0.04)
+
+        for (let i = 0; i < 4; i += 1) {
+          const blade = new Mesh(new BoxGeometry(0.12, 0.52, 0.03), mats.blade)
+          blade.position.y = 0.24
+          blade.rotation.z = (Math.PI / 2) * i
+          rotor.add(blade)
+        }
+
+        mockWindmillTemplate.add(tower, rotor)
+        this.windmillTemplate = mockWindmillTemplate
+        this.windmillAnimations = []
+        this.attachWindmillInstance()
+        this.windmillLoadPromise = Promise.resolve()
+      }
+
+      return this.windmillLoadPromise
+    }
+
+    if (!this.windmillLoadPromise) {
+      const windmillUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/windmill__animated/scene.gltf', globalThis.location.origin).toString()
+          : '/models/windmill__animated/scene.gltf'
+
+      this.windmillLoadPromise = new Promise((resolve, reject) => {
+        this.windmillLoader.load(
+          windmillUrl,
+          (gltf) => {
+            this.windmillTemplate = gltf.scene.clone(true)
+            this.windmillAnimations = gltf.animations.map((clip) => clip.clone())
+            this.attachWindmillInstance()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.windmillLoadPromise
+  }
+
   activate(input: LayerUpdateInput) {
     this.update(input)
   }
 
   update(input: LayerUpdateInput) {
     const shouldShowCabin = this.shouldShowCabin(input)
-    const shouldShowWindmill = input.stageIndex >= 5
+    const shouldShowWindmill = this.shouldShowWindmill(input)
     const shouldShowRabbit = this.shouldShowRabbit(input)
     const cabinDayTuning = this.getCabinDayTuning(input.dayCount)
 
@@ -424,6 +500,11 @@ export class StructureLayer implements LayerController {
       // 房屋在第四阶段后半段与第五阶段延续出现，首次需要时再懒加载。
       void this.ensureCabinTemplate()
       this.updateCabinTransform(input.dayCount, cabinDayTuning)
+    }
+    if (shouldShowWindmill) {
+      // 第 36 天起接入动态风车模型，并在第 40 天前逐步放大。
+      void this.ensureWindmillTemplate()
+      this.updateWindmillTransform(input.dayCount)
     }
     if (shouldShowRabbit) {
       // 第 34 天起在房屋门口左前侧补一个兔子摆件，并沿用到后续天数。
@@ -448,13 +529,21 @@ export class StructureLayer implements LayerController {
     this.campfire.scale.setScalar(
       (input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1) * CAMPFIRE_MODEL_SCALE_FACTOR,
     )
-    this.windmillRotor.rotation.z = shouldShowWindmill ? input.dayCount * 0.12 : 0
     this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
     this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
   }
 
+  tick(elapsedMs: number) {
+    if (!this.windmill.visible || !this.windmillMixer) return
+    this.windmillMixer.setTime(elapsedMs * 0.001 * WINDMILL_ANIMATION_SPEED)
+  }
+
   private shouldShowCabin(input: LayerUpdateInput) {
     return input.stageIndex >= 4 && input.dayCount >= CABIN_TRANSITION_START_DAY && input.dayCount <= CABIN_STAGE_END_DAY
+  }
+
+  private shouldShowWindmill(input: LayerUpdateInput) {
+    return input.stageIndex >= 4 && input.dayCount >= WINDMILL_APPEAR_START_DAY
   }
 
   private shouldShowTent(input: LayerUpdateInput) {
@@ -481,6 +570,20 @@ export class StructureLayer implements LayerController {
     }
 
     return getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)
+  }
+
+  private getWindmillGrowthScale(dayCount: number) {
+    if (dayCount <= WINDMILL_APPEAR_START_DAY) return WINDMILL_GROWTH_START_SCALE
+    if (dayCount >= WINDMILL_GROWTH_END_DAY) return WINDMILL_GROWTH_END_SCALE
+
+    const progress =
+      (dayCount - WINDMILL_APPEAR_START_DAY) /
+      Math.max(1, WINDMILL_GROWTH_END_DAY - WINDMILL_APPEAR_START_DAY)
+
+    return (
+      WINDMILL_GROWTH_START_SCALE +
+      (WINDMILL_GROWTH_END_SCALE - WINDMILL_GROWTH_START_SCALE) * progress
+    )
   }
 
   deactivate() {
@@ -708,6 +811,30 @@ export class StructureLayer implements LayerController {
     this.rabbit.add(instance)
   }
 
+  private attachWindmillInstance() {
+    this.windmill.clear()
+    this.windmillMixer = null
+    if (!this.windmillTemplate) return
+
+    const instance = this.windmillTemplate.clone(true)
+    const bounds = new Box3().setFromObject(instance)
+    const size = bounds.getSize(new Vector3())
+    const center = bounds.getCenter(new Vector3())
+    const safeHeight = Math.max(size.y, 0.001)
+    const scale = WINDMILL_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.scale.setScalar(scale)
+    instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
+    this.windmill.add(instance)
+
+    if (this.windmillAnimations.length === 0) return
+
+    this.windmillMixer = new AnimationMixer(instance)
+    this.windmillAnimations.forEach((clip) => {
+      this.windmillMixer?.clipAction(clip).play()
+    })
+  }
+
   private createWoodenFenceAnchors() {
     // 勿动
     const anchors = [
@@ -775,30 +902,22 @@ export class StructureLayer implements LayerController {
 
   private createWindmill() {
     const group = new Group()
-    const tower = new Mesh(new CylinderGeometry(0.05, 0.09, 1.1, 6), mats.houseBody)
-    tower.position.y = 0.55
-
-    const rotor = new Group()
-    rotor.position.set(0, 1.08, 0)
-
-    for (let i = 0; i < 4; i += 1) {
-      const blade = new Mesh(new BoxGeometry(0.12, 0.5, 0.03), mats.blade)
-      blade.position.y = 0.24
-      blade.rotation.z = (Math.PI / 2) * i
-      rotor.add(blade)
-    }
-
-    group.add(tower, rotor)
-
-    const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.18, 4.75),
-      this.planetRadius + 0.04,
+    const { pos, quaternion } = getSurfaceTransformWithClearance(
+      new Vector3().setFromSphericalCoords(1, WINDMILL_SURFACE_PHI, WINDMILL_SURFACE_THETA),
+      this.planetRadius,
+      WINDMILL_SURFACE_CLEARANCE,
     )
     group.position.copy(pos)
     group.quaternion.copy(quaternion)
+    group.rotateY(WINDMILL_YAW_OFFSET)
+    group.scale.setScalar(this.getWindmillGrowthScale(WINDMILL_APPEAR_START_DAY))
     group.visible = false
 
     return group
+  }
+
+  private updateWindmillTransform(dayCount: number) {
+    this.windmill.scale.setScalar(this.getWindmillGrowthScale(dayCount))
   }
 
   private createBench() {

@@ -48,7 +48,7 @@ export const habitPlanetManifest: HabitPlanetManifest = {
     { id: 'sprout', scope: 'hero', stages: [1], preloadAt: [1], source: 'existing-reuse', degradeTo: null },
     { id: 'campfire', scope: 'hero', stages: [2], preloadAt: [2], source: 'required-model', degradeTo: null },
     { id: 'hut-full', scope: 'hero', stages: [4, 5, 6], preloadAt: [3, 4], source: 'required-model', degradeTo: 'hut-basic' },
-    { id: 'windmill', scope: 'hero', stages: [4, 5, 6], preloadAt: [4], source: 'required-model', degradeTo: 'windmill-static' },
+    { id: 'windmill', scope: 'hero', stages: [4, 5, 6], preloadAt: [4], source: 'required-model', degradeTo: null },
     { id: 'rabbit', scope: 'hero', stages: [4, 5], preloadAt: [4], source: 'required-model', degradeTo: 'rabbit-static' },
     { id: 'bench', scope: 'hero', stages: [5, 6], preloadAt: [5], source: 'procedural-kitbash', degradeTo: null },
     { id: 'swing', scope: 'hero', stages: [5, 6], preloadAt: [5], source: 'procedural-kitbash', degradeTo: null },

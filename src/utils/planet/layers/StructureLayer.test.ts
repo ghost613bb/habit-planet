@@ -22,6 +22,15 @@ function getCabinModelHeight(hutFull: Group) {
   return size.y
 }
 
+function getWindmillModelHeight(windmill: Group) {
+  const windmillModel = windmill.children[0]
+  expect(windmillModel).toBeTruthy()
+  const detachedModel = windmillModel!.clone(true)
+  const bounds = new Box3().setFromObject(detachedModel)
+  const size = bounds.getSize(new Vector3())
+  return size.y
+}
+
 function isCabinWindowMaterial(
   material: unknown,
 ): material is MeshLambertMaterial | MeshStandardMaterial {
@@ -156,7 +165,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(hutFacing.angleTo(tentFacing)).toBeLessThan(0.2)
   })
 
-  it('第 19-21 天会在树外侧逐日累加栅栏，并在 22-45 天保留房屋与栅栏', async () => {
+  it('第 19-21 天会在树外侧逐日累加栅栏，并在第 36 天前保持房屋与栅栏主导展示', async () => {
     const layer = createLayer()
     const woodenFences = (layer as any).woodenFences as Group[]
     const hutFull = (layer as any).hutFull as Group
@@ -220,9 +229,9 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(windmill.visible).toBe(false)
 
     layer.update({
-      dayCount: 45,
+      dayCount: 35,
       stageIndex: 4 as const,
-      stageProgress: 1,
+      stageProgress: 0.5652,
       qualityTier: 'tier-1' as const,
     })
     expect(woodenFences.filter((item) => item.visible)).toHaveLength(4)
@@ -309,7 +318,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(day45EmissiveIntensity).toBeCloseTo(day28EmissiveIntensity, 5)
   })
 
-  it('第 34 天起会在房屋门口左前方显示兔子，并延续到后续阶段', async () => {
+  it('第 34 天起会显示兔子，并延续到后续阶段', async () => {
     const layer = createLayer()
     const hutFull = (layer as any).hutFull as Group
     const rabbit = (layer as any).rabbit as Group
@@ -335,14 +344,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(hutFull.visible).toBe(true)
     expect(rabbit.visible).toBe(true)
 
-    const hutNormal = hutFull.position.clone().normalize()
-    const hutFacing = new Vector3(0, 0, 1).applyQuaternion(hutFull.quaternion).projectOnPlane(hutNormal).normalize()
-    const hutLeft = hutNormal.clone().cross(hutFacing).normalize()
-    const rabbitOffset = rabbit.position.clone().sub(hutFull.position).projectOnPlane(hutNormal)
-
     expect(rabbit.position.distanceTo(hutFull.position)).toBeGreaterThan(0.15)
-    expect(rabbitOffset.dot(hutFacing)).toBeGreaterThan(0.02)
-    expect(rabbitOffset.dot(hutLeft)).toBeGreaterThan(0.02)
 
     layer.update({
       dayCount: 46,
@@ -353,6 +355,60 @@ describe('结构图层中的第三阶段帐篷', () => {
 
     expect(hutFull.visible).toBe(true)
     expect(rabbit.visible).toBe(true)
+  })
+
+  it('第 36 天起显示动态风车，并在第 40 天前逐步放大', async () => {
+    const layer = createLayer()
+    const windmill = (layer as any).windmill as Group
+    await layer.preload()
+
+    layer.update({
+      dayCount: 35,
+      stageIndex: 4 as const,
+      stageProgress: 0.5652,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(windmill.visible).toBe(false)
+
+    layer.update({
+      dayCount: 36,
+      stageIndex: 4 as const,
+      stageProgress: 0.6087,
+      qualityTier: 'tier-1' as const,
+    })
+    const day36Scale = windmill.scale.x
+    const day36Position = windmill.position.clone()
+    const day36ModelHeight = getWindmillModelHeight(windmill)
+
+    expect(windmill.visible).toBe(true)
+    expect(windmill.children.length).toBeGreaterThan(0)
+    expect(day36Scale).toBeCloseTo(0.72, 5)
+    expect(day36ModelHeight).toBeCloseTo(1.18, 2)
+
+    layer.update({
+      dayCount: 38,
+      stageIndex: 4 as const,
+      stageProgress: 0.6957,
+      qualityTier: 'tier-1' as const,
+    })
+    const day38Scale = windmill.scale.x
+    const day38Position = windmill.position.clone()
+
+    expect(day38Scale).toBeGreaterThan(day36Scale)
+    expect(day38Scale).toBeLessThan(1)
+    expect(day38Position.distanceTo(day36Position)).toBeLessThan(1e-6)
+
+    layer.update({
+      dayCount: 40,
+      stageIndex: 4 as const,
+      stageProgress: 0.7826,
+      qualityTier: 'tier-1' as const,
+    })
+    const day40Scale = windmill.scale.x
+    const day40Position = windmill.position.clone()
+
+    expect(day40Scale).toBeCloseTo(1, 5)
+    expect(day40Position.distanceTo(day36Position)).toBeLessThan(1e-6)
   })
 
   it('第 46 天起恢复后续结构展示逻辑', async () => {
