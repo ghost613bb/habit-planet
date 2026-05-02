@@ -92,6 +92,16 @@ const RABBIT_FRONT_OFFSET = 0.68
 const RABBIT_LEFT_OFFSET = 0.52
 // 控制水平朝向
 const RABBIT_YAW_OFFSET = -1
+// 控制秋千模型整体大小
+const SWING_MODEL_TARGET_HEIGHT = 0.92
+// 控制秋千离地高度
+const SWING_SURFACE_CLEARANCE = 0.02
+// 控制秋千相对房屋的前后位置
+const SWING_FRONT_OFFSET = 2.46
+// 控制秋千相对房屋的左右位置，调大后会更靠兔子左侧
+const SWING_LEFT_OFFSET = 1.8
+// 控制秋千的水平朝向
+const SWING_YAW_OFFSET = -0.5
 const CABIN_SURFACE_CLEARANCE_MICRO_FACTOR = 1 / 6
 const CABIN_INSTANCE_SINK_OFFSET = 0.45
 const CABIN_SURFACE_CLEARANCE_BASELINE =
@@ -186,6 +196,19 @@ function getRabbitPlacementData(planetRadius: number) {
   }
 }
 
+function getSwingPlacementData(planetRadius: number) {
+  const { plankNormal, leftDirection, tentSurfaceNormal } = getCabinPlacementData(planetRadius)
+  const swingAnchorPos = tentSurfaceNormal
+    .clone()
+    .addScaledVector(plankNormal, SWING_FRONT_OFFSET)
+    .addScaledVector(leftDirection, SWING_LEFT_OFFSET)
+
+  return {
+    plankNormal,
+    swingSurfaceNormal: swingAnchorPos.normalize(),
+  }
+}
+
 export function isGrassPatchBlockedByTent(normal: Vector3, dayCount: number, planetRadius: number) {
   if (dayCount < 18) return false
 
@@ -233,13 +256,16 @@ export class StructureLayer implements LayerController {
   private rabbitTemplate: Group | null = null
   private rabbitLoader = new GLTFLoader(new LoadingManager())
   private rabbitLoadPromise: Promise<void> | null = null
+  private swing: Group
+  private swingTemplate: Group | null = null
+  private swingLoader = new GLTFLoader(new LoadingManager())
+  private swingLoadPromise: Promise<void> | null = null
   private windmill: Group
   private windmillTemplate: Group | null = null
   private windmillAnimations: AnimationClip[] = []
   private windmillMixer: AnimationMixer | null = null
   private windmillLoader = new GLTFLoader(new LoadingManager())
   private windmillLoadPromise: Promise<void> | null = null
-  private swing: Group
 
   constructor(options: StructureLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -274,6 +300,7 @@ export class StructureLayer implements LayerController {
       this.ensureCabinTemplate('wooden'),
       this.ensureWoodenFenceTemplate(),
       this.ensureRabbitTemplate(),
+      this.ensureSwingTemplate(),
     ]).then(() => undefined)
   }
 
@@ -539,6 +566,59 @@ export class StructureLayer implements LayerController {
     return this.rabbitLoadPromise
   }
 
+  private ensureSwingTemplate(): Promise<void> {
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.swingLoadPromise) {
+        const mockSwingTemplate = new Group()
+        const leftLeg = new Mesh(new BoxGeometry(0.06, 0.78, 0.06), mats.houseBody)
+        leftLeg.position.set(-0.28, 0.39, 0)
+        leftLeg.rotation.z = 0.24
+        const rightLeg = new Mesh(new BoxGeometry(0.06, 0.78, 0.06), mats.houseBody)
+        rightLeg.position.set(0.28, 0.39, 0)
+        rightLeg.rotation.z = -0.24
+        const topBeam = new Mesh(new BoxGeometry(0.78, 0.07, 0.08), mats.houseRoof)
+        topBeam.position.y = 0.76
+        const seat = new Mesh(new BoxGeometry(0.28, 0.05, 0.14), mats.houseRoof)
+        seat.position.set(0, 0.32, 0)
+        const leftRope = new Mesh(new BoxGeometry(0.02, 0.34, 0.02), mats.blade)
+        leftRope.position.set(-0.08, 0.48, 0)
+        const rightRope = new Mesh(new BoxGeometry(0.02, 0.34, 0.02), mats.blade)
+        rightRope.position.set(0.08, 0.48, 0)
+        mockSwingTemplate.add(leftLeg, rightLeg, topBeam, seat, leftRope, rightRope)
+        this.swingTemplate = mockSwingTemplate
+        this.attachSwingInstance()
+        this.swingLoadPromise = Promise.resolve()
+      }
+
+      return this.swingLoadPromise
+    }
+
+    if (!this.swingLoadPromise) {
+      const swingUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/farm_wood-swing/scene.gltf', globalThis.location.origin).toString()
+          : '/models/farm_wood-swing/scene.gltf'
+
+      this.swingLoadPromise = new Promise((resolve, reject) => {
+        this.swingLoader.load(
+          swingUrl,
+          (gltf) => {
+            this.swingTemplate = gltf.scene.clone(true)
+            this.attachSwingInstance()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.swingLoadPromise
+  }
+
   private ensureWindmillTemplate(): Promise<void> {
     const isJsdomEnvironment =
       typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
@@ -632,6 +712,11 @@ export class StructureLayer implements LayerController {
       // 第 34 天起在房屋门口左前侧补一个兔子摆件，并沿用到后续天数。
       void this.ensureRabbitTemplate()
       this.updateRabbitTransform()
+    }
+    if (input.stageIndex >= 5) {
+      // 第五阶段开始在兔子旁边接入秋千模型，后续如需替换模型只需要保留这条挂载链路。
+      void this.ensureSwingTemplate()
+      this.updateSwingTransform()
     }
 
     this.campfire.visible = input.stageIndex >= 2
@@ -938,6 +1023,53 @@ export class StructureLayer implements LayerController {
     this.rabbit.add(instance)
   }
 
+  private createSwing() {
+    const group = new Group()
+    const { plankNormal, swingSurfaceNormal } = getSwingPlacementData(this.planetRadius)
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      swingSurfaceNormal,
+      this.planetRadius,
+      SWING_SURFACE_CLEARANCE,
+    )
+    group.position.copy(pos)
+    group.quaternion.copy(quaternion)
+    this.alignFacingToSurfaceTarget(group, surfaceNormal, plankNormal)
+    group.rotateY(SWING_YAW_OFFSET)
+    group.visible = false
+
+    return group
+  }
+
+  private updateSwingTransform() {
+    const { plankNormal, swingSurfaceNormal } = getSwingPlacementData(this.planetRadius)
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      swingSurfaceNormal,
+      this.planetRadius,
+      SWING_SURFACE_CLEARANCE,
+    )
+    this.swing.position.copy(pos)
+    this.swing.quaternion.copy(quaternion)
+    this.alignFacingToSurfaceTarget(this.swing, surfaceNormal, plankNormal)
+    this.swing.rotateY(SWING_YAW_OFFSET)
+  }
+
+  private attachSwingInstance() {
+    this.swing.clear()
+    if (!this.swingTemplate) return
+
+    const instance = this.swingTemplate.clone(true)
+    const bounds = new Box3().setFromObject(instance)
+    const size = bounds.getSize(new Vector3())
+    const center = bounds.getCenter(new Vector3())
+    const safeHeight = Math.max(size.y, 0.001)
+    const scale = SWING_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.scale.setScalar(scale)
+    instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
+
+    this.swing.add(instance)
+  }
+
   private attachWindmillInstance() {
     this.windmill.clear()
     this.windmillMixer = null
@@ -1047,18 +1179,4 @@ export class StructureLayer implements LayerController {
     this.windmill.scale.setScalar(this.getWindmillGrowthScale(dayCount))
   }
 
-  private createSwing() {
-    const group = new Group()
-    // 先保留秋千的挂点与显示链路，当前旧秋千模型本体先移除，后续再替换成新模型。
-
-    const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.2, 5.35),
-      this.planetRadius + 0.02,
-    )
-    group.position.copy(pos)
-    group.quaternion.copy(quaternion)
-    group.visible = false
-
-    return group
-  }
 }

@@ -31,6 +31,15 @@ function getWindmillModelHeight(windmill: Group) {
   return size.y
 }
 
+function getSwingModelHeight(swing: Group) {
+  const swingModel = swing.children[0]
+  expect(swingModel).toBeTruthy()
+  const detachedModel = swingModel!.clone(true)
+  const bounds = new Box3().setFromObject(detachedModel)
+  const size = bounds.getSize(new Vector3())
+  return size.y
+}
+
 function isCabinWindowMaterial(
   material: unknown,
 ): material is MeshLambertMaterial | MeshStandardMaterial {
@@ -448,6 +457,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     const layer = createLayer()
     const hutFull = (layer as any).hutFull as Group
     const windmill = (layer as any).windmill as Group
+    const rabbit = (layer as any).rabbit as Group
     const swing = (layer as any).swing as Group
     await layer.preload()
 
@@ -475,7 +485,10 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(hutFull.visible).toBe(true)
     expect(windmill.visible).toBe(true)
     expect(swing.visible).toBe(true)
-    expect(swing.children.length).toBe(0)
+    expect(swing.children.length).toBeGreaterThan(0)
+    expect(getSwingModelHeight(swing)).toBeCloseTo(0.92, 2)
+    expect(swing.position.distanceTo(rabbit.position)).toBeGreaterThan(0.2)
+    expect(swing.position.distanceTo(rabbit.position)).toBeLessThan(1.2)
     expect(getCabinWindowMaterials(hutFull).length).toBeGreaterThan(0)
     expect(
       Math.max(...getCabinWindowMaterials(hutFull).map((item) => item.emissiveIntensity), 0),

@@ -1,0 +1,11 @@
+Model Information:
+* title:	farm_wood-swing
+* source:	https://sketchfab.com/3d-models/farm-wood-swing-7b26349c627d4430853a661f4c8a85e1
+* author:	xenera (https://sketchfab.com/xenera)
+
+Model License:
+* license type:	CC-BY-NC-ND-4.0 (http://creativecommons.org/licenses/by-nc-nd/4.0/)
+* requirements:	Author must be credited. No commercial use. Modified versions can not be distributed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "farm_wood-swing" (https://sketchfab.com/3d-models/farm-wood-swing-7b26349c627d4430853a661f4c8a85e1) by xenera (https://sketchfab.com/xenera) licensed under CC-BY-NC-ND-4.0 (http://creativecommons.org/licenses/by-nc-nd/4.0/)
