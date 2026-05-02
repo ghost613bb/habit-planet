@@ -45,5 +45,7 @@ public/gemini_xq - 副本.html
 .claude/
 .superpowers/
 note.md
+# 本地规划与设计文档不进入版本库
 /docs/
+/docs/**
 AGENTS.md
