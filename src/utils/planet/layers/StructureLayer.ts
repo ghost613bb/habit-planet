@@ -36,7 +36,7 @@ type StructureLayerOptions = {
   planetRadius: number
 }
 
-type CabinVariant = 'legacy' | 'wooden'
+export type CabinVariant = 'legacy' | 'wooden'
 type CabinWindowMaterial = MeshLambertMaterial | MeshStandardMaterial
 
 const CAMPFIRE_MODEL_SCALE_FACTOR = 0.95
@@ -59,6 +59,10 @@ const WOODEN_CABIN_INSTANCE_SINK_OFFSET = 0
 const WOODEN_CABIN_INSTANCE_OFFSET_X = 0.28
 const WOODEN_CABIN_INSTANCE_OFFSET_Z = -0.4
 const WOODEN_CABIN_INSTANCE_YAW_OFFSET = -0.25
+const LEGACY_CABIN_WINDOW_GLOW_LOCAL_OFFSET_X = 0
+const LEGACY_CABIN_WINDOW_GLOW_LOCAL_OFFSET_Z = 0.12
+const WOODEN_CABIN_WINDOW_GLOW_LOCAL_OFFSET_X = WOODEN_CABIN_INSTANCE_OFFSET_X
+const WOODEN_CABIN_WINDOW_GLOW_LOCAL_OFFSET_Z = WOODEN_CABIN_INSTANCE_OFFSET_Z + 0.18
 const RABBIT_APPEAR_START_DAY = 34
 const WINDMILL_APPEAR_START_DAY = 36
 const WINDMILL_GROWTH_END_DAY = 40
@@ -109,6 +113,53 @@ export function getCabinPlacementData(planetRadius: number) {
     leftDirection,
     tentSurfaceNormal: tentAnchorPos.normalize(),
   }
+}
+
+function rotateCabinLocalOffset(offsetX: number, offsetZ: number, yawOffset: number) {
+  return {
+    x: offsetX * Math.cos(yawOffset) + offsetZ * Math.sin(yawOffset),
+    z: -offsetX * Math.sin(yawOffset) + offsetZ * Math.cos(yawOffset),
+  }
+}
+
+export function getCabinVariantByDay(dayCount: number): CabinVariant {
+  return dayCount >= CABIN_MODEL_SWITCH_DAY ? 'wooden' : 'legacy'
+}
+
+export function getCabinWindowGlowNormal(planetRadius: number, dayCount: number) {
+  const variant = getCabinVariantByDay(dayCount)
+  const { plankNormal, tentSurfaceNormal } = getCabinPlacementData(planetRadius)
+  const cabinDayTuning = getStageFourCabinDayTuning(CABIN_TRANSITION_END_DAY)
+  const { pos: cabinPos, surfaceNormal } = getSurfaceTransformWithClearance(
+    tentSurfaceNormal,
+    planetRadius,
+    getCabinSurfaceClearance(cabinDayTuning.surfaceClearance),
+  )
+  const forwardDirection = plankNormal
+    .clone()
+    .projectOnPlane(surfaceNormal)
+    .normalize()
+  const rightDirection = surfaceNormal
+    .clone()
+    .cross(forwardDirection)
+    .normalize()
+  const localOffset =
+    variant === 'wooden'
+      ? rotateCabinLocalOffset(
+          WOODEN_CABIN_WINDOW_GLOW_LOCAL_OFFSET_X,
+          WOODEN_CABIN_WINDOW_GLOW_LOCAL_OFFSET_Z,
+          WOODEN_CABIN_INSTANCE_YAW_OFFSET,
+        )
+      : {
+          x: LEGACY_CABIN_WINDOW_GLOW_LOCAL_OFFSET_X,
+          z: LEGACY_CABIN_WINDOW_GLOW_LOCAL_OFFSET_Z,
+        }
+
+  return cabinPos
+    .clone()
+    .addScaledVector(rightDirection, localOffset.x)
+    .addScaledVector(forwardDirection, localOffset.z)
+    .normalize()
 }
 
 function getCabinSurfaceClearance(surfaceClearance: number) {
@@ -301,7 +352,7 @@ export class StructureLayer implements LayerController {
   }
 
   private getCabinVariant(dayCount: number): CabinVariant {
-    return dayCount >= CABIN_MODEL_SWITCH_DAY ? 'wooden' : 'legacy'
+    return getCabinVariantByDay(dayCount)
   }
 
   private getCabinTemplate(variant: CabinVariant) {

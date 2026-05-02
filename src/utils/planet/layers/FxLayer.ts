@@ -11,7 +11,7 @@ import {
 import { mats } from '../assets/Materials'
 import { getStageFourCabinDayTuning } from '../config/stageFourCabinDayTuning'
 import { getSurfaceTransform } from '../math/PlanetMath'
-import { getCabinPlacementData } from './StructureLayer'
+import { getCabinWindowGlowNormal } from './StructureLayer'
 import {
   CAMPFIRE_GLOW_RADIUS_OFFSET,
   CAMPFIRE_LIGHT_RADIUS_OFFSET,
@@ -25,8 +25,7 @@ const CAMPFIRE_ONLY_END_DAY = 45
 const CABIN_GLOW_START_DAY = 22
 const CABIN_GLOW_STABLE_DAY = 28
 const ENERGY_RING_START_DAY = 41
-const CABIN_WINDOW_GLOW_RADIUS_OFFSET = 0.3
-const CABIN_AURA_GLOW_RADIUS_OFFSET = 0.2
+const CABIN_WINDOW_GLOW_RADIUS_OFFSET = 0.24
 // 控制能量光圈内半径
 const ENERGY_RING_INNER_RADIUS = 3.86
 // 控制能量光圈外半径
@@ -77,9 +76,7 @@ export class FxLayer implements LayerController {
   private orbitRingOuter: Mesh
   private energyRing: Mesh
   private energyRingUpper: Mesh
-  private windowGlow: Mesh
   private cabinWindowGlow: Mesh
-  private cabinAuraGlow: Mesh
 
   constructor(options: FxLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -97,13 +94,10 @@ export class FxLayer implements LayerController {
       ENERGY_RING_UPPER_OUTER_RADIUS_BASE,
       96,
     )
-    this.windowGlow = this.createRingMesh(0.05, 0.11, 16)
-    this.cabinWindowGlow = this.createRingMesh(0.08, 0.18, 24)
-    this.cabinAuraGlow = this.createRingMesh(0.2, 0.38, 32)
+    this.cabinWindowGlow = this.createRingMesh(0.04, 0.1, 20)
     this.tintRing(this.energyRing, '#9fe8ff', '#55d8ff')
     this.tintRing(this.energyRingUpper, '#b8eeff', '#6ce3ff')
     this.tintRing(this.cabinWindowGlow, '#ffd38a', '#ffb14d')
-    this.tintRing(this.cabinAuraGlow, '#ffb25a', '#ff8e2b')
 
     this.setupTransforms()
     this.group.add(
@@ -113,9 +107,7 @@ export class FxLayer implements LayerController {
       this.orbitRingOuter,
       this.energyRing,
       this.energyRingUpper,
-      this.windowGlow,
       this.cabinWindowGlow,
-      this.cabinAuraGlow,
     )
   }
 
@@ -131,10 +123,10 @@ export class FxLayer implements LayerController {
     const shouldKeepCampfireOnly =
       input.dayCount >= CAMPFIRE_ONLY_START_DAY && input.dayCount <= CAMPFIRE_ONLY_END_DAY
     const shouldShowEnergyRing = input.stageIndex >= 4 && this.shouldShowEnergyRing(input.dayCount)
-    const shouldShowWindowGlow = input.stageIndex >= 4 && !shouldKeepCampfireOnly
     const shouldShowOrbitRing = false
     const shouldShowOrbitRingOuter = false
-    const shouldShowCabinGlow = input.stageIndex >= 4 && input.dayCount >= CABIN_GLOW_START_DAY
+    const shouldShowCabinGlow =
+      input.stageIndex >= 4 && input.dayCount >= CABIN_GLOW_START_DAY && !shouldKeepCampfireOnly
     const cabinGlowWarmth = shouldShowCabinGlow ? this.getCabinGlowWarmth(input.dayCount) : 0
 
     this.campfireLight.visible = input.stageIndex >= 2
@@ -145,20 +137,11 @@ export class FxLayer implements LayerController {
       input.stageIndex >= 2 ? 0.28 + input.stageProgress * 0.16 : 0,
     )
 
-    this.windowGlow.visible = shouldShowWindowGlow
-    this.setRingOpacity(
-      this.windowGlow,
-      shouldShowWindowGlow ? 0.2 + input.stageProgress * 0.25 : 0,
-    )
+    this.syncCabinWindowGlowTransform(input.dayCount)
     this.cabinWindowGlow.visible = shouldShowCabinGlow
     this.setRingOpacity(
       this.cabinWindowGlow,
-      shouldShowCabinGlow ? 0.08 + cabinGlowWarmth * 1.6 : 0,
-    )
-    this.cabinAuraGlow.visible = shouldShowCabinGlow
-    this.setRingOpacity(
-      this.cabinAuraGlow,
-      shouldShowCabinGlow ? 0.04 + cabinGlowWarmth * 1.1 : 0,
+      shouldShowCabinGlow ? 0.03 + cabinGlowWarmth * 0.42 : 0,
     )
 
     this.energyRing.visible = shouldShowEnergyRing
@@ -285,6 +268,15 @@ export class FxLayer implements LayerController {
     this.energyRingUpper.geometry = refreshedGeometry
   }
 
+  private syncCabinWindowGlowTransform(dayCount: number) {
+    const cabinWindowTransform = getSurfaceTransform(
+      getCabinWindowGlowNormal(this.planetRadius, dayCount),
+      this.planetRadius + CABIN_WINDOW_GLOW_RADIUS_OFFSET,
+    )
+    this.cabinWindowGlow.position.copy(cabinWindowTransform.pos)
+    this.cabinWindowGlow.quaternion.copy(cabinWindowTransform.quaternion)
+  }
+
   private setupTransforms() {
     const campfireTransform = getSurfaceTransform(
       new Vector3().setFromSphericalCoords(1, CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA),
@@ -307,27 +299,7 @@ export class FxLayer implements LayerController {
     this.energyRingUpper.position.set(0, ENERGY_RING_UPPER_VERTICAL_OFFSET, 0)
     this.energyRingUpper.rotation.x = ENERGY_RING_UPPER_TILT_X
     this.energyRingUpper.rotation.z = ENERGY_RING_UPPER_TILT_Z
-
-    const windowTransform = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.2, 2.1),
-      this.planetRadius + 0.35,
-    )
-    this.windowGlow.position.copy(windowTransform.pos)
-    this.windowGlow.quaternion.copy(windowTransform.quaternion)
-    const { tentSurfaceNormal } = getCabinPlacementData(this.planetRadius)
-    const cabinWindowTransform = getSurfaceTransform(
-      tentSurfaceNormal,
-      this.planetRadius + CABIN_WINDOW_GLOW_RADIUS_OFFSET,
-    )
-    this.cabinWindowGlow.position.copy(cabinWindowTransform.pos)
-    this.cabinWindowGlow.quaternion.copy(cabinWindowTransform.quaternion)
-
-    const cabinAuraTransform = getSurfaceTransform(
-      tentSurfaceNormal,
-      this.planetRadius + CABIN_AURA_GLOW_RADIUS_OFFSET,
-    )
-    this.cabinAuraGlow.position.copy(cabinAuraTransform.pos)
-    this.cabinAuraGlow.quaternion.copy(cabinAuraTransform.quaternion)
+    this.syncCabinWindowGlowTransform(CABIN_GLOW_START_DAY)
 
     this.campfireLight.visible = false
     this.campfireGlow.visible = false
@@ -335,8 +307,6 @@ export class FxLayer implements LayerController {
     this.orbitRingOuter.visible = false
     this.energyRing.visible = false
     this.energyRingUpper.visible = false
-    this.windowGlow.visible = false
     this.cabinWindowGlow.visible = false
-    this.cabinAuraGlow.visible = false
   }
 }
