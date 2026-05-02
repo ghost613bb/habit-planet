@@ -119,34 +119,8 @@ export class CharacterLayer implements LayerController {
   }
 
   private createBirds() {
-    const anchors = [
-      { phi: 0.22, theta: 0.3 },
-      { phi: 0.18, theta: 1.8 },
-    ]
-
-    return anchors.map((anchor) => {
-      const bird = new Group()
-      const body = new Mesh(new SphereGeometry(0.05, 8, 8), mats.leaves2)
-      body.scale.set(1.2, 0.7, 0.7)
-      const wingLeft = new Mesh(new SphereGeometry(0.03, 6, 6), mats.leaves1)
-      wingLeft.scale.set(1.8, 0.4, 0.8)
-      wingLeft.position.set(-0.05, 0.02, -0.02)
-      const wingRight = new Mesh(new SphereGeometry(0.03, 6, 6), mats.leaves1)
-      wingRight.scale.set(1.8, 0.4, 0.8)
-      wingRight.position.set(-0.05, 0.02, 0.02)
-
-      bird.add(body, wingLeft, wingRight)
-
-      const { pos, quaternion } = getSurfaceTransform(
-        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius + 0.55,
-      )
-      bird.position.copy(pos)
-      bird.quaternion.copy(quaternion)
-      bird.visible = false
-
-      return bird
-    })
+    // 先移除这套叶片样式的飞鸟占位，后续如需替换再接入新飞行模型。
+    return []
   }
 
   private createButterflies() {
