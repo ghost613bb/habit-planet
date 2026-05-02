@@ -36,6 +36,7 @@ type StructureLayerOptions = {
   planetRadius: number
 }
 
+type CabinVariant = 'legacy' | 'wooden'
 type CabinWindowMaterial = MeshLambertMaterial | MeshStandardMaterial
 
 const CAMPFIRE_MODEL_SCALE_FACTOR = 0.95
@@ -48,9 +49,16 @@ const TENT_RIGHT_GRASS_OFFSET = 0.14
 const WOODEN_FENCE_MODEL_TARGET_HEIGHT = 0.58
 const WOODEN_FENCE_SURFACE_CLEARANCE = 0.02
 const CABIN_MODEL_TARGET_HEIGHT = 1.5
+const CABIN_MODEL_SWITCH_DAY = 60
 const CABIN_TRANSITION_START_DAY = 22
 const CABIN_TRANSITION_END_DAY = 28
 const CABIN_STAGE_END_DAY = 45
+const LEGACY_CABIN_MODEL_PATH = '/models/low_poly_log_cabin/scene.gltf'
+const WOODEN_CABIN_MODEL_PATH = '/models/low_poly_wooden_cabine/scene.gltf'
+const WOODEN_CABIN_INSTANCE_SINK_OFFSET = 0
+const WOODEN_CABIN_INSTANCE_OFFSET_X = 0.28
+const WOODEN_CABIN_INSTANCE_OFFSET_Z = -0.4
+const WOODEN_CABIN_INSTANCE_YAW_OFFSET = -0.25
 const RABBIT_APPEAR_START_DAY = 34
 const WINDMILL_APPEAR_START_DAY = 36
 const WINDMILL_GROWTH_END_DAY = 40
@@ -157,9 +165,13 @@ export class StructureLayer implements LayerController {
   private tentTemplate: Group | null = null
   private tentLoader = new GLTFLoader(new LoadingManager())
   private tentLoadPromise: Promise<void> | null = null
-  private cabinTemplate: Group | null = null
+  private legacyCabinTemplate: Group | null = null
+  private woodenCabinTemplate: Group | null = null
   private cabinLoader = new GLTFLoader(new LoadingManager())
-  private cabinLoadPromise: Promise<void> | null = null
+  private legacyCabinLoadPromise: Promise<void> | null = null
+  private woodenCabinLoadPromise: Promise<void> | null = null
+  private activeCabinVariant: CabinVariant | null = null
+  private desiredCabinVariant: CabinVariant = 'legacy'
   private woodenFenceTemplate: Group | null = null
   private woodenFenceLoader = new GLTFLoader(new LoadingManager())
   private woodenFenceLoadPromise: Promise<void> | null = null
@@ -207,7 +219,8 @@ export class StructureLayer implements LayerController {
     return Promise.all([
       this.ensureCampfireTemplate(),
       this.ensureTentTemplate(),
-      this.ensureCabinTemplate(),
+      this.ensureCabinTemplate('legacy'),
+      this.ensureCabinTemplate('wooden'),
       this.ensureWoodenFenceTemplate(),
       this.ensureRabbitTemplate(),
     ]).then(() => undefined)
@@ -287,50 +300,108 @@ export class StructureLayer implements LayerController {
     return this.tentLoadPromise
   }
 
-  private ensureCabinTemplate(): Promise<void> {
+  private getCabinVariant(dayCount: number): CabinVariant {
+    return dayCount >= CABIN_MODEL_SWITCH_DAY ? 'wooden' : 'legacy'
+  }
+
+  private getCabinTemplate(variant: CabinVariant) {
+    return variant === 'wooden' ? this.woodenCabinTemplate : this.legacyCabinTemplate
+  }
+
+  private setCabinTemplate(variant: CabinVariant, template: Group) {
+    if (variant === 'wooden') {
+      this.woodenCabinTemplate = template
+      return
+    }
+
+    this.legacyCabinTemplate = template
+  }
+
+  private getCabinLoadPromise(variant: CabinVariant) {
+    return variant === 'wooden' ? this.woodenCabinLoadPromise : this.legacyCabinLoadPromise
+  }
+
+  private setCabinLoadPromise(variant: CabinVariant, loadPromise: Promise<void>) {
+    if (variant === 'wooden') {
+      this.woodenCabinLoadPromise = loadPromise
+      return
+    }
+
+    this.legacyCabinLoadPromise = loadPromise
+  }
+
+  private getCabinUrl(variant: CabinVariant) {
+    const cabinModelPath =
+      variant === 'wooden' ? WOODEN_CABIN_MODEL_PATH : LEGACY_CABIN_MODEL_PATH
+
+    return typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+      ? new URL(cabinModelPath, globalThis.location.origin).toString()
+      : cabinModelPath
+  }
+
+  private createMockCabinTemplate(variant: CabinVariant) {
+    const mockCabinTemplate = new Group()
+    mockCabinTemplate.name = variant === 'wooden' ? 'wooden-cabin-template' : 'legacy-cabin-template'
+
+    // 测试环境里补一个最小占位体，保证包围盒、缩放与窗材逻辑都可验证。
+    const bodyWidth = variant === 'wooden' ? 0.92 : 1
+    const bodyDepth = variant === 'wooden' ? 0.88 : 1
+    const body = new Mesh(new BoxGeometry(bodyWidth, 1, bodyDepth), mats.houseBody)
+    const window = new Mesh(
+      new BoxGeometry(0.3, 0.25, 0.02),
+      new MeshStandardMaterial({ color: '#00d7ff' }),
+    )
+    window.position.set(0, 0.15, 0.51)
+    mockCabinTemplate.add(body, window)
+
+    return mockCabinTemplate
+  }
+
+  private syncCabinInstance(variant: CabinVariant) {
+    if (this.activeCabinVariant === variant) return
+
+    const cabinTemplate = this.getCabinTemplate(variant)
+    if (!cabinTemplate) return
+
+    this.attachCabinInstance(cabinTemplate, variant)
+  }
+
+  private ensureCabinTemplate(variant: CabinVariant): Promise<void> {
     const isJsdomEnvironment =
       typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
 
     if (isJsdomEnvironment) {
-      if (!this.cabinLoadPromise) {
-        const mockCabinTemplate = new Group()
-        // 测试环境里补一个最小占位体，保证包围盒、缩放与窗材逻辑都可验证。
-        const body = new Mesh(new BoxGeometry(1, 1, 1), mats.houseBody)
-        const window = new Mesh(
-          new BoxGeometry(0.3, 0.25, 0.02),
-          new MeshStandardMaterial({ color: '#00d7ff' }),
-        )
-        window.position.set(0, 0.15, 0.51)
-        mockCabinTemplate.add(body, window)
-        this.cabinTemplate = mockCabinTemplate
-        this.attachCabinInstance()
-        this.cabinLoadPromise = Promise.resolve()
+      const existingLoadPromise = this.getCabinLoadPromise(variant)
+      if (!existingLoadPromise) {
+        this.setCabinTemplate(variant, this.createMockCabinTemplate(variant))
+        this.syncCabinInstance(variant)
+        this.setCabinLoadPromise(variant, Promise.resolve())
       }
 
-      return this.cabinLoadPromise
+      return this.getCabinLoadPromise(variant) as Promise<void>
     }
 
-    if (!this.cabinLoadPromise) {
-      const cabinUrl =
-        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
-          ? new URL('/models/low_poly_log_cabin/scene.gltf', globalThis.location.origin).toString()
-          : '/models/low_poly_log_cabin/scene.gltf'
-
-      this.cabinLoadPromise = new Promise((resolve, reject) => {
+    const existingLoadPromise = this.getCabinLoadPromise(variant)
+    if (!existingLoadPromise) {
+      const cabinLoadPromise = new Promise<void>((resolve, reject) => {
         this.cabinLoader.load(
-          cabinUrl,
+          this.getCabinUrl(variant),
           (gltf) => {
-            this.cabinTemplate = gltf.scene.clone(true)
-            this.attachCabinInstance()
+            this.setCabinTemplate(variant, gltf.scene.clone(true))
+            if (this.desiredCabinVariant === variant) {
+              this.syncCabinInstance(variant)
+            }
             resolve()
           },
           undefined,
           reject,
         )
       })
+
+      this.setCabinLoadPromise(variant, cabinLoadPromise)
     }
 
-    return this.cabinLoadPromise
+    return this.getCabinLoadPromise(variant) as Promise<void>
   }
 
   private ensureWoodenFenceTemplate(): Promise<void> {
@@ -479,6 +550,7 @@ export class StructureLayer implements LayerController {
     const shouldShowWindmill = this.shouldShowWindmill(input)
     const shouldShowRabbit = this.shouldShowRabbit(input)
     const cabinDayTuning = this.getCabinDayTuning(input.dayCount)
+    const cabinVariant = this.getCabinVariant(input.dayCount)
 
     if (input.stageIndex >= 2) {
       // 真实运行链路不会主动预加载，这里在第一次需要展示篝火时懒加载一次。
@@ -495,7 +567,9 @@ export class StructureLayer implements LayerController {
     }
     if (shouldShowCabin || shouldShowWindmill) {
       // 房屋在第四阶段后半段与第五阶段延续出现，首次需要时再懒加载。
-      void this.ensureCabinTemplate()
+      this.desiredCabinVariant = cabinVariant
+      void this.ensureCabinTemplate(cabinVariant)
+      this.syncCabinInstance(cabinVariant)
       this.updateCabinTransform(input.dayCount, cabinDayTuning)
     }
     if (shouldShowWindmill) {
@@ -725,12 +799,11 @@ export class StructureLayer implements LayerController {
     this.syncCabinWindowWarmth(dayCount)
   }
 
-  private attachCabinInstance() {
+  private attachCabinInstance(cabinTemplate: Group, variant: CabinVariant) {
     this.hutFull.clear()
     this.cabinWindowMaterials = []
-    if (!this.cabinTemplate) return
 
-    const instance = this.cabinTemplate.clone(true)
+    const instance = cabinTemplate.clone(true)
     const bounds = new Box3().setFromObject(instance)
     const size = bounds.getSize(new Vector3())
     const center = bounds.getCenter(new Vector3())
@@ -750,12 +823,20 @@ export class StructureLayer implements LayerController {
     })
 
     instance.scale.setScalar(scale)
+    const cabinSinkOffset =
+      variant === 'wooden' ? WOODEN_CABIN_INSTANCE_SINK_OFFSET : CABIN_INSTANCE_SINK_OFFSET
+    const cabinOffsetX = variant === 'wooden' ? WOODEN_CABIN_INSTANCE_OFFSET_X : 0
+    const cabinOffsetZ = variant === 'wooden' ? WOODEN_CABIN_INSTANCE_OFFSET_Z : 0
+    const cabinYawOffset = variant === 'wooden' ? WOODEN_CABIN_INSTANCE_YAW_OFFSET : 0
     instance.position.set(
-      -center.x * scale,
-      -bounds.min.y * scale - CABIN_INSTANCE_SINK_OFFSET,
-      -center.z * scale,
+      -center.x * scale + cabinOffsetX,
+      -bounds.min.y * scale - cabinSinkOffset,
+      -center.z * scale + cabinOffsetZ,
     )
+    instance.rotateY(cabinYawOffset)
 
+    this.activeCabinVariant = variant
+    this.hutFull.userData.cabinVariant = variant
     this.hutFull.add(instance)
   }
 

@@ -357,6 +357,39 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(rabbit.visible).toBe(true)
   })
 
+  it('第 60 天起切换为新房屋模型，并保持原有摆放参数连续', async () => {
+    const layer = createLayer()
+    const hutFull = (layer as any).hutFull as Group
+    await layer.preload()
+
+    layer.update({
+      dayCount: 59,
+      stageIndex: 5 as const,
+      stageProgress: 0.9,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const day59Position = hutFull.position.clone()
+    const day59Quaternion = hutFull.quaternion.clone()
+    const day59Scale = hutFull.scale.clone()
+    const day59Variant = (hutFull.userData as { cabinVariant?: string }).cabinVariant
+
+    layer.update({
+      dayCount: 60,
+      stageIndex: 5 as const,
+      stageProgress: 0.95,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const day60Variant = (hutFull.userData as { cabinVariant?: string }).cabinVariant
+
+    expect(day59Variant).toBe('legacy')
+    expect(day60Variant).toBe('wooden')
+    expect(hutFull.position.distanceTo(day59Position)).toBeLessThan(1e-6)
+    expect(hutFull.quaternion.angleTo(day59Quaternion)).toBeLessThan(1e-6)
+    expect(hutFull.scale.distanceTo(day59Scale)).toBeLessThan(1e-6)
+  })
+
   it('第 36 天起显示动态风车，并在第 40 天前逐步放大', async () => {
     const layer = createLayer()
     const windmill = (layer as any).windmill as Group
