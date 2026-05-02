@@ -176,7 +176,6 @@ export class StructureLayer implements LayerController {
   private windmillMixer: AnimationMixer | null = null
   private windmillLoader = new GLTFLoader(new LoadingManager())
   private windmillLoadPromise: Promise<void> | null = null
-  private bench: Group
   private swing: Group
 
   constructor(options: StructureLayerOptions) {
@@ -191,7 +190,6 @@ export class StructureLayer implements LayerController {
     this.hutFull = this.createHutFull()
     this.rabbit = this.createRabbit()
     this.windmill = this.createWindmill()
-    this.bench = this.createBench()
     this.swing = this.createSwing()
 
     this.group.add(
@@ -201,7 +199,6 @@ export class StructureLayer implements LayerController {
       this.hutFull,
       this.rabbit,
       this.windmill,
-      this.bench,
       this.swing,
     )
   }
@@ -523,13 +520,11 @@ export class StructureLayer implements LayerController {
     this.hutFull.visible = shouldShowCabin || shouldShowWindmill
     this.rabbit.visible = shouldShowRabbit
     this.windmill.visible = shouldShowWindmill
-    this.bench.visible = input.stageIndex >= 5
     this.swing.visible = input.stageIndex >= 5
 
     this.campfire.scale.setScalar(
       (input.stageIndex === 2 ? 0.9 + input.stageProgress * 0.2 : 1) * CAMPFIRE_MODEL_SCALE_FACTOR,
     )
-    this.bench.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
     this.swing.scale.setScalar(input.stageIndex >= 5 ? 0.9 + input.stageProgress * 0.1 : 1)
   }
 
@@ -918,30 +913,6 @@ export class StructureLayer implements LayerController {
 
   private updateWindmillTransform(dayCount: number) {
     this.windmill.scale.setScalar(this.getWindmillGrowthScale(dayCount))
-  }
-
-  private createBench() {
-    const group = new Group()
-    const seat = new Mesh(new BoxGeometry(0.4, 0.05, 0.14), mats.houseBody)
-    seat.position.y = 0.24
-    const back = new Mesh(new BoxGeometry(0.4, 0.16, 0.04), mats.houseBody)
-    back.position.set(0, 0.36, -0.05)
-    const legLeft = new Mesh(new BoxGeometry(0.04, 0.2, 0.04), mats.trunk)
-    legLeft.position.set(-0.14, 0.1, 0)
-    const legRight = new Mesh(new BoxGeometry(0.04, 0.2, 0.04), mats.trunk)
-    legRight.position.set(0.14, 0.1, 0)
-
-    group.add(seat, back, legLeft, legRight)
-
-    const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.18, 3.5),
-      this.planetRadius + 0.02,
-    )
-    group.position.copy(pos)
-    group.quaternion.copy(quaternion)
-    group.visible = false
-
-    return group
   }
 
   private createSwing() {

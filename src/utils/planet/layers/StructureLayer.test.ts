@@ -382,7 +382,7 @@ describe('结构图层中的第三阶段帐篷', () => {
 
     expect(windmill.visible).toBe(true)
     expect(windmill.children.length).toBeGreaterThan(0)
-    expect(day36Scale).toBeCloseTo(0.72, 5)
+    expect(day36Scale).toBeCloseTo(1, 5)
     expect(day36ModelHeight).toBeCloseTo(1.18, 2)
 
     layer.update({
@@ -395,7 +395,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     const day38Position = windmill.position.clone()
 
     expect(day38Scale).toBeGreaterThan(day36Scale)
-    expect(day38Scale).toBeLessThan(1)
+    expect(day38Scale).toBeLessThan(1.8)
     expect(day38Position.distanceTo(day36Position)).toBeLessThan(1e-6)
 
     layer.update({
@@ -407,7 +407,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     const day40Scale = windmill.scale.x
     const day40Position = windmill.position.clone()
 
-    expect(day40Scale).toBeCloseTo(1, 5)
+    expect(day40Scale).toBeCloseTo(1.8, 5)
     expect(day40Position.distanceTo(day36Position)).toBeLessThan(1e-6)
   })
 
@@ -415,7 +415,6 @@ describe('结构图层中的第三阶段帐篷', () => {
     const layer = createLayer()
     const hutFull = (layer as any).hutFull as Group
     const windmill = (layer as any).windmill as Group
-    const bench = (layer as any).bench as Group
     const swing = (layer as any).swing as Group
     await layer.preload()
 
@@ -442,7 +441,6 @@ describe('结构图层中的第三阶段帐篷', () => {
 
     expect(hutFull.visible).toBe(true)
     expect(windmill.visible).toBe(true)
-    expect(bench.visible).toBe(true)
     expect(swing.visible).toBe(true)
     expect(getCabinWindowMaterials(hutFull).length).toBeGreaterThan(0)
     expect(

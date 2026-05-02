@@ -36,7 +36,7 @@ export const habitPlanetManifest: HabitPlanetManifest = {
     5: {
       cameraPreset: 'flourish',
       layers: ['terrain', 'vegetation', 'structure', 'character', 'fx'],
-      heroIds: ['bench', 'swing'],
+      heroIds: ['swing'],
     },
     6: {
       cameraPreset: 'finale',
@@ -47,13 +47,12 @@ export const habitPlanetManifest: HabitPlanetManifest = {
   assets: [
     { id: 'sprout', scope: 'hero', stages: [1], preloadAt: [1], source: 'existing-reuse', degradeTo: null },
     { id: 'campfire', scope: 'hero', stages: [2], preloadAt: [2], source: 'required-model', degradeTo: null },
-    { id: 'hut-full', scope: 'hero', stages: [4, 5, 6], preloadAt: [3, 4], source: 'required-model', degradeTo: 'hut-basic' },
+    { id: 'hut-full', scope: 'hero', stages: [4, 5, 6], preloadAt: [3, 4], source: 'required-model', degradeTo: null },
     { id: 'windmill', scope: 'hero', stages: [4, 5, 6], preloadAt: [4], source: 'required-model', degradeTo: null },
-    { id: 'rabbit', scope: 'hero', stages: [4, 5], preloadAt: [4], source: 'required-model', degradeTo: 'rabbit-static' },
-    { id: 'bench', scope: 'hero', stages: [5, 6], preloadAt: [5], source: 'procedural-kitbash', degradeTo: null },
+    { id: 'rabbit', scope: 'hero', stages: [4, 5], preloadAt: [4], source: 'required-model', degradeTo: null },
     { id: 'swing', scope: 'hero', stages: [5, 6], preloadAt: [5], source: 'procedural-kitbash', degradeTo: null },
     { id: 'butterfly-fx', scope: 'optional-fx', stages: [5, 6], preloadAt: [5], source: 'procedural-fx', degradeTo: null },
-    { id: 'life-tree', scope: 'hero', stages: [6], preloadAt: [5, 6], source: 'required-model', degradeTo: 'glow-tree-basic' },
+    { id: 'life-tree', scope: 'hero', stages: [6], preloadAt: [5, 6], source: 'required-model', degradeTo: null },
     { id: 'stardust-fx', scope: 'optional-fx', stages: [6], preloadAt: [6], source: 'procedural-fx', degradeTo: null },
   ],
 }

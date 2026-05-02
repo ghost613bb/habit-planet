@@ -23,7 +23,6 @@ export class CharacterLayer implements LayerController {
   private parentGroup: Group
   private planetRadius: number
   private group: Group
-  private rabbit: Group
   private deer: Group
   private birds: Group[] = []
   private butterflies: Group[] = []
@@ -34,12 +33,11 @@ export class CharacterLayer implements LayerController {
     this.group = new Group()
     this.parentGroup.add(this.group)
 
-    this.rabbit = this.createRabbit()
     this.deer = this.createDeer()
     this.birds = this.createBirds()
     this.butterflies = this.createButterflies()
 
-    this.group.add(this.rabbit, this.deer)
+    this.group.add(this.deer)
     this.birds.forEach((item) => this.group.add(item))
     this.butterflies.forEach((item) => this.group.add(item))
   }
@@ -57,7 +55,6 @@ export class CharacterLayer implements LayerController {
       input.dayCount >= STAGE_THREE_END_STATE_START_DAY &&
       input.dayCount <= STAGE_THREE_END_STATE_END_DAY
 
-    this.rabbit.visible = input.stageIndex >= 4 && !shouldHoldStageThreeEndState
     this.deer.visible = input.stageIndex >= 6 && input.qualityTier !== 'tier-0'
 
     const showBirds =
@@ -97,42 +94,15 @@ export class CharacterLayer implements LayerController {
     this.parentGroup.remove(this.group)
   }
 
-  private createRabbit() {
-    const rabbit = new Group()
-    const body = new Mesh(new SphereGeometry(0.14, 10, 10), mats.bear)
-    body.scale.set(1.1, 0.8, 1)
-    body.position.y = 0.15
-    const head = new Mesh(new SphereGeometry(0.1, 10, 10), mats.bear)
-    head.position.set(0.12, 0.28, 0)
-    const earLeft = new Mesh(new SphereGeometry(0.035, 8, 8), mats.bear)
-    earLeft.scale.set(0.6, 2.1, 0.6)
-    earLeft.position.set(0.16, 0.44, -0.04)
-    const earRight = new Mesh(new SphereGeometry(0.035, 8, 8), mats.bear)
-    earRight.scale.set(0.6, 2.1, 0.6)
-    earRight.position.set(0.16, 0.44, 0.04)
-
-    rabbit.add(body, head, earLeft, earRight)
-
-    const { pos, quaternion } = getSurfaceTransform(
-      new Vector3().setFromSphericalCoords(1, 0.18, 2.6),
-      this.planetRadius + 0.02,
-    )
-    rabbit.position.copy(pos)
-    rabbit.quaternion.copy(quaternion)
-    rabbit.visible = false
-
-    return rabbit
-  }
-
   private createDeer() {
     const deer = new Group()
-    const body = new Mesh(new SphereGeometry(0.18, 10, 10), mats.rabbit)
+    const body = new Mesh(new SphereGeometry(0.18, 10, 10), mats.animalPink)
     body.scale.set(1.5, 0.8, 0.7)
     body.position.y = 0.22
-    const neck = new Mesh(new SphereGeometry(0.07, 8, 8), mats.rabbit)
+    const neck = new Mesh(new SphereGeometry(0.07, 8, 8), mats.animalPink)
     neck.scale.set(0.7, 1.8, 0.7)
     neck.position.set(0.2, 0.38, 0)
-    const head = new Mesh(new SphereGeometry(0.09, 8, 8), mats.rabbit)
+    const head = new Mesh(new SphereGeometry(0.09, 8, 8), mats.animalPink)
     head.position.set(0.26, 0.54, 0)
 
     deer.add(body, neck, head)

@@ -143,8 +143,7 @@ export const mats = {
   trunk: new MeshLambertMaterial({ color: '#5a3a2a' }),
   leaves1: new MeshLambertMaterial({ color: 0x88dd88, flatShading: true }),
   leaves2: new MeshLambertMaterial({ color: 0x55aa55, flatShading: true }),
-  rabbit: new MeshLambertMaterial({ color: 0xffb7b2 }),
-  bear: new MeshLambertMaterial({ color: 0xffffff }),
+  animalPink: new MeshLambertMaterial({ color: 0xffb7b2 }),
   rock: new MeshLambertMaterial({ color: 0x808080 }),
   ring: new MeshStandardMaterial({
     color: 0xffffff,
