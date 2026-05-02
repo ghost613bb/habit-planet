@@ -309,6 +309,52 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(day45EmissiveIntensity).toBeCloseTo(day28EmissiveIntensity, 5)
   })
 
+  it('第 34 天起会在房屋门口左前方显示兔子，并延续到后续阶段', async () => {
+    const layer = createLayer()
+    const hutFull = (layer as any).hutFull as Group
+    const rabbit = (layer as any).rabbit as Group
+    await layer.preload()
+
+    expect(rabbit.children.length).toBeGreaterThan(0)
+
+    layer.update({
+      dayCount: 33,
+      stageIndex: 4 as const,
+      stageProgress: 0.8,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(rabbit.visible).toBe(false)
+
+    layer.update({
+      dayCount: 34,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+
+    expect(hutFull.visible).toBe(true)
+    expect(rabbit.visible).toBe(true)
+
+    const hutNormal = hutFull.position.clone().normalize()
+    const hutFacing = new Vector3(0, 0, 1).applyQuaternion(hutFull.quaternion).projectOnPlane(hutNormal).normalize()
+    const hutLeft = hutNormal.clone().cross(hutFacing).normalize()
+    const rabbitOffset = rabbit.position.clone().sub(hutFull.position).projectOnPlane(hutNormal)
+
+    expect(rabbit.position.distanceTo(hutFull.position)).toBeGreaterThan(0.15)
+    expect(rabbitOffset.dot(hutFacing)).toBeGreaterThan(0.02)
+    expect(rabbitOffset.dot(hutLeft)).toBeGreaterThan(0.02)
+
+    layer.update({
+      dayCount: 46,
+      stageIndex: 5 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+
+    expect(hutFull.visible).toBe(true)
+    expect(rabbit.visible).toBe(true)
+  })
+
   it('第 46 天起恢复后续结构展示逻辑', async () => {
     const layer = createLayer()
     const hutFull = (layer as any).hutFull as Group

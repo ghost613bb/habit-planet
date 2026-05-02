@@ -49,6 +49,17 @@ const CABIN_MODEL_TARGET_HEIGHT = 1.5
 const CABIN_TRANSITION_START_DAY = 22
 const CABIN_TRANSITION_END_DAY = 28
 const CABIN_STAGE_END_DAY = 45
+const RABBIT_APPEAR_START_DAY = 34
+// 控制兔子整体大小
+const RABBIT_MODEL_TARGET_HEIGHT = 0.62
+// 控制离地高度
+const RABBIT_SURFACE_CLEARANCE = 0.016
+// 控制前后位置
+const RABBIT_FRONT_OFFSET = 0.68
+// 控制左右位置
+const RABBIT_LEFT_OFFSET = 0.52
+// 控制水平朝向
+const RABBIT_YAW_OFFSET = -1
 const CABIN_SURFACE_CLEARANCE_MICRO_FACTOR = 1 / 6
 const CABIN_INSTANCE_SINK_OFFSET = 0.45
 const CABIN_SURFACE_CLEARANCE_BASELINE =
@@ -81,6 +92,19 @@ function getCabinSurfaceClearance(surfaceClearance: number) {
     ) *
       CABIN_SURFACE_CLEARANCE_MICRO_FACTOR
   )
+}
+
+function getRabbitPlacementData(planetRadius: number) {
+  const { plankNormal, leftDirection, tentSurfaceNormal } = getCabinPlacementData(planetRadius)
+  const rabbitAnchorPos = tentSurfaceNormal
+    .clone()
+    .addScaledVector(plankNormal, RABBIT_FRONT_OFFSET)
+    .addScaledVector(leftDirection, RABBIT_LEFT_OFFSET)
+
+  return {
+    plankNormal,
+    rabbitSurfaceNormal: rabbitAnchorPos.normalize(),
+  }
 }
 
 export function isGrassPatchBlockedByTent(normal: Vector3, dayCount: number, planetRadius: number) {
@@ -122,6 +146,10 @@ export class StructureLayer implements LayerController {
   private woodenFences: Group[] = []
   private cabinWindowMaterials: CabinWindowMaterial[] = []
   private hutFull: Group
+  private rabbit: Group
+  private rabbitTemplate: Group | null = null
+  private rabbitLoader = new GLTFLoader(new LoadingManager())
+  private rabbitLoadPromise: Promise<void> | null = null
   private windmill: Group
   private windmillRotor: Group
   private bench: Group
@@ -137,6 +165,7 @@ export class StructureLayer implements LayerController {
     this.tent = this.createTent()
     this.woodenFences = this.createWoodenFenceAnchors()
     this.hutFull = this.createHutFull()
+    this.rabbit = this.createRabbit()
     this.windmill = this.createWindmill()
     this.windmillRotor = this.windmill.children[1] as Group
     this.bench = this.createBench()
@@ -147,6 +176,7 @@ export class StructureLayer implements LayerController {
       this.tent,
       ...this.woodenFences,
       this.hutFull,
+      this.rabbit,
       this.windmill,
       this.bench,
       this.swing,
@@ -159,6 +189,7 @@ export class StructureLayer implements LayerController {
       this.ensureTentTemplate(),
       this.ensureCabinTemplate(),
       this.ensureWoodenFenceTemplate(),
+      this.ensureRabbitTemplate(),
     ]).then(() => undefined)
   }
 
@@ -319,6 +350,53 @@ export class StructureLayer implements LayerController {
     return this.woodenFenceLoadPromise
   }
 
+  private ensureRabbitTemplate(): Promise<void> {
+    const isJsdomEnvironment =
+      typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+
+    if (isJsdomEnvironment) {
+      if (!this.rabbitLoadPromise) {
+        const mockRabbitTemplate = new Group()
+        const body = new Mesh(new BoxGeometry(0.38, 0.34, 0.28), mats.houseBody)
+        body.position.y = 0.17
+        const head = new Mesh(new BoxGeometry(0.24, 0.22, 0.22), mats.houseBody)
+        head.position.set(0, 0.42, 0.08)
+        const leftEar = new Mesh(new BoxGeometry(0.06, 0.22, 0.05), mats.houseRoof)
+        leftEar.position.set(-0.05, 0.62, 0.06)
+        const rightEar = new Mesh(new BoxGeometry(0.06, 0.22, 0.05), mats.houseRoof)
+        rightEar.position.set(0.05, 0.62, 0.06)
+        mockRabbitTemplate.add(body, head, leftEar, rightEar)
+        this.rabbitTemplate = mockRabbitTemplate
+        this.attachRabbitInstance()
+        this.rabbitLoadPromise = Promise.resolve()
+      }
+
+      return this.rabbitLoadPromise
+    }
+
+    if (!this.rabbitLoadPromise) {
+      const rabbitUrl =
+        typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
+          ? new URL('/models/bonny__cute_bunny_character/scene.gltf', globalThis.location.origin).toString()
+          : '/models/bonny__cute_bunny_character/scene.gltf'
+
+      this.rabbitLoadPromise = new Promise((resolve, reject) => {
+        this.rabbitLoader.load(
+          rabbitUrl,
+          (gltf) => {
+            this.rabbitTemplate = gltf.scene.clone(true)
+            this.attachRabbitInstance()
+            resolve()
+          },
+          undefined,
+          reject,
+        )
+      })
+    }
+
+    return this.rabbitLoadPromise
+  }
+
   activate(input: LayerUpdateInput) {
     this.update(input)
   }
@@ -326,6 +404,7 @@ export class StructureLayer implements LayerController {
   update(input: LayerUpdateInput) {
     const shouldShowCabin = this.shouldShowCabin(input)
     const shouldShowWindmill = input.stageIndex >= 5
+    const shouldShowRabbit = this.shouldShowRabbit(input)
     const cabinDayTuning = this.getCabinDayTuning(input.dayCount)
 
     if (input.stageIndex >= 2) {
@@ -346,6 +425,11 @@ export class StructureLayer implements LayerController {
       void this.ensureCabinTemplate()
       this.updateCabinTransform(input.dayCount, cabinDayTuning)
     }
+    if (shouldShowRabbit) {
+      // 第 34 天起在房屋门口左前侧补一个兔子摆件，并沿用到后续天数。
+      void this.ensureRabbitTemplate()
+      this.updateRabbitTransform()
+    }
 
     this.campfire.visible = input.stageIndex >= 2
     this.tent.visible = this.shouldShowTent(input)
@@ -356,6 +440,7 @@ export class StructureLayer implements LayerController {
       woodenFence.visible = i < visibleWoodenFenceCount
     }
     this.hutFull.visible = shouldShowCabin || shouldShowWindmill
+    this.rabbit.visible = shouldShowRabbit
     this.windmill.visible = shouldShowWindmill
     this.bench.visible = input.stageIndex >= 5
     this.swing.visible = input.stageIndex >= 5
@@ -374,6 +459,10 @@ export class StructureLayer implements LayerController {
 
   private shouldShowTent(input: LayerUpdateInput) {
     return input.dayCount >= 18 && input.stageIndex >= 3 && input.dayCount < CABIN_TRANSITION_START_DAY
+  }
+
+  private shouldShowRabbit(input: LayerUpdateInput) {
+    return input.stageIndex >= 4 && input.dayCount >= RABBIT_APPEAR_START_DAY
   }
 
   private getVisibleWoodenFenceCount(input: LayerUpdateInput) {
@@ -570,6 +659,53 @@ export class StructureLayer implements LayerController {
     )
 
     this.hutFull.add(instance)
+  }
+
+  private createRabbit() {
+    const group = new Group()
+    const { plankNormal, rabbitSurfaceNormal } = getRabbitPlacementData(this.planetRadius)
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      rabbitSurfaceNormal,
+      this.planetRadius,
+      RABBIT_SURFACE_CLEARANCE,
+    )
+    group.position.copy(pos)
+    group.quaternion.copy(quaternion)
+    this.alignFacingToSurfaceTarget(group, surfaceNormal, plankNormal)
+    group.rotateY(RABBIT_YAW_OFFSET)
+    group.visible = false
+
+    return group
+  }
+
+  private updateRabbitTransform() {
+    const { plankNormal, rabbitSurfaceNormal } = getRabbitPlacementData(this.planetRadius)
+    const { pos, quaternion, surfaceNormal } = getSurfaceTransformWithClearance(
+      rabbitSurfaceNormal,
+      this.planetRadius,
+      RABBIT_SURFACE_CLEARANCE,
+    )
+    this.rabbit.position.copy(pos)
+    this.rabbit.quaternion.copy(quaternion)
+    this.alignFacingToSurfaceTarget(this.rabbit, surfaceNormal, plankNormal)
+    this.rabbit.rotateY(RABBIT_YAW_OFFSET)
+  }
+
+  private attachRabbitInstance() {
+    this.rabbit.clear()
+    if (!this.rabbitTemplate) return
+
+    const instance = this.rabbitTemplate.clone(true)
+    const bounds = new Box3().setFromObject(instance)
+    const size = bounds.getSize(new Vector3())
+    const center = bounds.getCenter(new Vector3())
+    const safeHeight = Math.max(size.y, 0.001)
+    const scale = RABBIT_MODEL_TARGET_HEIGHT / safeHeight
+
+    instance.scale.setScalar(scale)
+    instance.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale)
+
+    this.rabbit.add(instance)
   }
 
   private createWoodenFenceAnchors() {
