@@ -124,7 +124,7 @@ describe('FxLayer', () => {
     expect(day45UpperOuterRadius).toBeGreaterThan(day43UpperOuterRadius)
   })
 
-  it('第 46 天起恢复窗光与光环，并保留房屋 glow', () => {
+  it('第 46 天起继续保留第 45 天的双光圈，不再额外出现新的外层光环', () => {
     const layer = createLayer()
     const orbitRing = (layer as any).orbitRing as Mesh
     const orbitRingOuter = (layer as any).orbitRingOuter as Mesh
@@ -135,11 +135,11 @@ describe('FxLayer', () => {
     const cabinAuraGlow = (layer as any).cabinAuraGlow as Mesh
 
     updateLayer(layer, 46)
-    expect(energyRing.visible).toBe(false)
-    expect(energyRingUpper.visible).toBe(false)
+    expect(energyRing.visible).toBe(true)
+    expect(energyRingUpper.visible).toBe(true)
     expect(windowGlow.visible).toBe(true)
-    expect(orbitRing.visible).toBe(true)
-    expect(orbitRingOuter.visible).toBe(true)
+    expect(orbitRing.visible).toBe(false)
+    expect(orbitRingOuter.visible).toBe(false)
     expect(cabinWindowGlow.visible).toBe(true)
     expect(cabinAuraGlow.visible).toBe(true)
   })

@@ -25,7 +25,6 @@ const CAMPFIRE_ONLY_END_DAY = 45
 const CABIN_GLOW_START_DAY = 22
 const CABIN_GLOW_STABLE_DAY = 28
 const ENERGY_RING_START_DAY = 41
-const ENERGY_RING_END_DAY = 45
 const CABIN_WINDOW_GLOW_RADIUS_OFFSET = 0.3
 const CABIN_AURA_GLOW_RADIUS_OFFSET = 0.2
 // 控制能量光圈内半径
@@ -133,8 +132,8 @@ export class FxLayer implements LayerController {
       input.dayCount >= CAMPFIRE_ONLY_START_DAY && input.dayCount <= CAMPFIRE_ONLY_END_DAY
     const shouldShowEnergyRing = input.stageIndex >= 4 && this.shouldShowEnergyRing(input.dayCount)
     const shouldShowWindowGlow = input.stageIndex >= 4 && !shouldKeepCampfireOnly
-    const shouldShowOrbitRing = input.stageIndex >= 4 && !shouldKeepCampfireOnly
-    const shouldShowOrbitRingOuter = input.stageIndex >= 5 && !shouldKeepCampfireOnly
+    const shouldShowOrbitRing = false
+    const shouldShowOrbitRingOuter = false
     const shouldShowCabinGlow = input.stageIndex >= 4 && input.dayCount >= CABIN_GLOW_START_DAY
     const cabinGlowWarmth = shouldShowCabinGlow ? this.getCabinGlowWarmth(input.dayCount) : 0
 
@@ -234,7 +233,7 @@ export class FxLayer implements LayerController {
   }
 
   private shouldShowEnergyRing(dayCount: number) {
-    return dayCount >= ENERGY_RING_START_DAY && dayCount <= ENERGY_RING_END_DAY
+    return dayCount >= ENERGY_RING_START_DAY
   }
 
   private getEnergyRingOpacity(dayCount: number, qualityTier: LayerUpdateInput['qualityTier']) {
@@ -245,8 +244,8 @@ export class FxLayer implements LayerController {
     }
 
     const progress =
-      (Math.min(dayCount, ENERGY_RING_END_DAY) - ENERGY_RING_START_DAY) /
-      Math.max(1, ENERGY_RING_END_DAY - ENERGY_RING_START_DAY)
+      (Math.min(dayCount, 45) - ENERGY_RING_START_DAY) /
+      Math.max(1, 45 - ENERGY_RING_START_DAY)
     const qualityFactor = qualityTier === 'tier-0' ? 0.72 : 1
 
     return (
@@ -262,8 +261,8 @@ export class FxLayer implements LayerController {
     }
 
     const progress =
-      (Math.min(dayCount, ENERGY_RING_END_DAY) - ENERGY_RING_START_DAY) /
-      Math.max(1, ENERGY_RING_END_DAY - ENERGY_RING_START_DAY)
+      (Math.min(dayCount, 45) - ENERGY_RING_START_DAY) /
+      Math.max(1, 45 - ENERGY_RING_START_DAY)
     const qualityFactor = qualityTier === 'tier-0' ? 0.72 : 1
 
     return (
@@ -276,8 +275,8 @@ export class FxLayer implements LayerController {
     if (!this.shouldShowEnergyRing(dayCount)) return
 
     const progress =
-      (Math.min(dayCount, ENERGY_RING_END_DAY) - ENERGY_RING_START_DAY) /
-      Math.max(1, ENERGY_RING_END_DAY - ENERGY_RING_START_DAY)
+      (Math.min(dayCount, 45) - ENERGY_RING_START_DAY) /
+      Math.max(1, 45 - ENERGY_RING_START_DAY)
     const targetOuterRadius =
       ENERGY_RING_UPPER_OUTER_RADIUS_BASE +
       (ENERGY_RING_UPPER_OUTER_RADIUS_MAX - ENERGY_RING_UPPER_OUTER_RADIUS_BASE) * progress

@@ -74,7 +74,7 @@ export class TerrainLayer implements LayerController {
       2: 0.48 + input.stageProgress * 0.18,
       3: 0.68,
       4: 0.68,
-      5: 0.9,
+      5: 0.68,
       6: 1,
     }
 

@@ -23,6 +23,7 @@ import {
 } from '../assets/FlowerBush'
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
 import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
+import { getStageFiveTreeDayTuning, type TreeModelVariant } from '../config/stageFiveTreeDayTuning'
 import { getStageFourFlowerDayTuning } from '../config/stageFourFlowerDayTuning'
 import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
@@ -51,6 +52,18 @@ const FLOWER_BUSH_MODEL_SCALE_FACTOR = 0.95
 const LOW_POLY_FLOWER_TARGET_HEIGHT = 0.6
 const LOW_POLY_FLOWER_SURFACE_CLEARANCE = 0.065
 const BUSH_OUTWARD_PHI_OFFSET = 0.09
+const BASE_TREE_TARGET_HEIGHTS = {
+  leftTall: 0.82 * LEAFY_TREE_SCALE_BOOST,
+  rightTall: 0.7 * LEAFY_TREE_SCALE_BOOST,
+  wide: 0.88 * WIDE_TREE_SCALE_BOOST,
+  farTall: 0.7 * LEAFY_TREE_SCALE_BOOST,
+}
+const REFINED_TREE_TARGET_HEIGHTS = {
+  leftTall: BASE_TREE_TARGET_HEIGHTS.leftTall * 1.08,
+  rightTall: BASE_TREE_TARGET_HEIGHTS.rightTall * 1.08,
+  wide: BASE_TREE_TARGET_HEIGHTS.wide * 1.08,
+  farTall: BASE_TREE_TARGET_HEIGHTS.farTall * 1.08,
+}
 const BUSH_BASE_ANCHORS: BushAnchor[] = [
   { phi: 0.42, theta: 1.02 },
   { phi: 0.38, theta: 1.78 },
@@ -81,6 +94,7 @@ export class VegetationLayer implements LayerController {
   private lowPolyWideTreeLoadPromise: Promise<void> | null = null
   private flowerBushLoadPromise: Promise<void> | null = null
   private lowPolyFlowerLoadPromise: Promise<void> | null = null
+  private currentTreeModelVariant: TreeModelVariant = 'base'
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -182,8 +196,16 @@ export class VegetationLayer implements LayerController {
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).vegetation : null
     const stageThreeTuning = input.stageIndex >= 3 ? getStageThreeDayTuning(input.dayCount) : null
+    const nextTreeModelVariant =
+      input.stageIndex >= 5 ? getStageFiveTreeDayTuning(input.dayCount).treeModelVariant : 'base'
     const persistedStageTwoTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).vegetation : null
     const inheritedVegetationTuning = stageTwoTuning ?? persistedStageTwoTuning
+
+    if (nextTreeModelVariant !== this.currentTreeModelVariant) {
+      this.currentTreeModelVariant = nextTreeModelVariant
+      // 第 54 天触发树模型统一升级时，重新挂载全部树实例以保持“全量替换”。
+      this.attachTreeInstances()
+    }
 
     this.sprout.visible = input.stageIndex === 1
     if (stageOneDay != null) {
@@ -525,12 +547,16 @@ export class VegetationLayer implements LayerController {
   }
 
   private attachTreeInstances() {
+    const treeHeights =
+      this.currentTreeModelVariant === 'refined' ? REFINED_TREE_TARGET_HEIGHTS : BASE_TREE_TARGET_HEIGHTS
+
     this.trees.forEach((tree, index) => {
       tree.clear()
+      tree.userData.treeModelVariant = this.currentTreeModelVariant
       if (index === 2) {
         tree.add(
           createLowPolyWideTreeInstance({
-            targetHeight: 0.88 * WIDE_TREE_SCALE_BOOST,
+            targetHeight: treeHeights.wide,
             rotationY: 0.35,
           }),
         )
@@ -539,7 +565,7 @@ export class VegetationLayer implements LayerController {
 
       tree.add(
         createLeafyTreeInstance({
-          targetHeight: (index === 0 ? 0.82 : 0.7) * LEAFY_TREE_SCALE_BOOST,
+          targetHeight: index === 0 ? treeHeights.leftTall : index === 1 ? treeHeights.rightTall : treeHeights.farTall,
           rotationY: index * 0.9,
         }),
       )
