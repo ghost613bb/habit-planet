@@ -1049,23 +1049,7 @@ export class StructureLayer implements LayerController {
 
   private createSwing() {
     const group = new Group()
-    const poleLeft = new Mesh(new CylinderGeometry(0.025, 0.03, 0.7, 6), mats.trunk)
-    poleLeft.position.set(-0.18, 0.36, 0)
-    poleLeft.rotation.z = 0.22
-    const poleRight = new Mesh(new CylinderGeometry(0.025, 0.03, 0.7, 6), mats.trunk)
-    poleRight.position.set(0.18, 0.36, 0)
-    poleRight.rotation.z = -0.22
-    const topBeam = new Mesh(new CylinderGeometry(0.025, 0.025, 0.45, 6), mats.trunk)
-    topBeam.position.set(0, 0.68, 0)
-    topBeam.rotation.z = Math.PI / 2
-    const ropeLeft = new Mesh(new CylinderGeometry(0.008, 0.008, 0.32, 4), mats.houseBody)
-    ropeLeft.position.set(-0.07, 0.46, 0)
-    const ropeRight = new Mesh(new CylinderGeometry(0.008, 0.008, 0.32, 4), mats.houseBody)
-    ropeRight.position.set(0.07, 0.46, 0)
-    const seat = new Mesh(new BoxGeometry(0.2, 0.04, 0.08), mats.houseRoof)
-    seat.position.set(0, 0.28, 0)
-
-    group.add(poleLeft, poleRight, topBeam, ropeLeft, ropeRight, seat)
+    // 先保留秋千的挂点与显示链路，当前旧秋千模型本体先移除，后续再替换成新模型。
 
     const { pos, quaternion } = getSurfaceTransform(
       new Vector3().setFromSphericalCoords(1, 0.2, 5.35),

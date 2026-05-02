@@ -475,6 +475,7 @@ describe('结构图层中的第三阶段帐篷', () => {
     expect(hutFull.visible).toBe(true)
     expect(windmill.visible).toBe(true)
     expect(swing.visible).toBe(true)
+    expect(swing.children.length).toBe(0)
     expect(getCabinWindowMaterials(hutFull).length).toBeGreaterThan(0)
     expect(
       Math.max(...getCabinWindowMaterials(hutFull).map((item) => item.emissiveIntensity), 0),
