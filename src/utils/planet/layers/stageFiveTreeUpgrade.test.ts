@@ -24,7 +24,7 @@ describe('第五阶段树模型升级', () => {
     const visibleTreesBeforeUpgrade = treesBeforeUpgrade.filter((item) => item.visible)
     const treeInstancesBeforeUpgrade = visibleTreesBeforeUpgrade.map((item) => item.children[0])
 
-    expect(visibleTreesBeforeUpgrade).toHaveLength(3)
+    expect(visibleTreesBeforeUpgrade).toHaveLength(4)
     expect(visibleTreesBeforeUpgrade.every((item) => item.userData.treeModelVariant === 'base')).toBe(true)
 
     vegetationLayer.update({
@@ -38,7 +38,7 @@ describe('第五阶段树模型升级', () => {
     const visibleTreesAfterUpgrade = treesAfterUpgrade.filter((item) => item.visible)
     const treeInstancesAfterUpgrade = visibleTreesAfterUpgrade.map((item) => item.children[0])
 
-    expect(visibleTreesAfterUpgrade).toHaveLength(3)
+    expect(visibleTreesAfterUpgrade).toHaveLength(4)
     expect(visibleTreesAfterUpgrade.every((item) => item.userData.treeModelVariant === 'refined')).toBe(true)
     treeInstancesAfterUpgrade.forEach((instance, index) => {
       expect(instance).toBeTruthy()

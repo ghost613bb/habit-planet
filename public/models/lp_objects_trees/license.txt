@@ -1,0 +1,11 @@
+Model Information:
+* title:	LP_objects_trees
+* source:	https://sketchfab.com/3d-models/lp-objects-trees-8b9e6a7e72914f668f4762f7723167f9
+* author:	CubeModeller (https://sketchfab.com/CubeModeller)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "LP_objects_trees" (https://sketchfab.com/3d-models/lp-objects-trees-8b9e6a7e72914f668f4762f7723167f9) by CubeModeller (https://sketchfab.com/CubeModeller) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

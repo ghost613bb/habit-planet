@@ -21,7 +21,13 @@ import {
   preloadFlowerBushTemplate,
   type FlowerBushPaletteVariant,
 } from '../assets/FlowerBush'
+import {
+  createLargestCanopyTreeInstance,
+  preloadLargestCanopyTreeTemplate,
+} from '../assets/LargestCanopyTree'
+import { createLeafTreeInstance, preloadLeafTreeTemplate } from '../assets/LeafTree'
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
+import { createLowpolyTreeInstance, preloadLowpolyTreeTemplate } from '../assets/LowpolyTree'
 import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
 import { getStageFiveTreeDayTuning, type TreeModelVariant } from '../config/stageFiveTreeDayTuning'
 import { getStageFourFlowerDayTuning } from '../config/stageFourFlowerDayTuning'
@@ -42,6 +48,8 @@ type BushAnchor = {
   theta: number
 }
 
+type RabbitNeighborTreeVariant = 'default' | 'largestCanopy'
+
 const SPROUT_SCALE_BOOST = 1.55
 const BUSH_SCALE_BOOST = 1.7
 const GRASS_PATCH_SCALE_BOOST = 1.75
@@ -52,6 +60,8 @@ const FLOWER_BUSH_MODEL_SCALE_FACTOR = 0.95
 const LOW_POLY_FLOWER_TARGET_HEIGHT = 0.6
 const LOW_POLY_FLOWER_SURFACE_CLEARANCE = 0.065
 const BUSH_OUTWARD_PHI_OFFSET = 0.09
+const RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY = 45
+const RABBIT_NEIGHBOR_TREE_HEIGHT_MULTIPLIER = 1.8
 const BASE_TREE_TARGET_HEIGHTS = {
   leftTall: 0.82 * LEAFY_TREE_SCALE_BOOST,
   rightTall: 0.7 * LEAFY_TREE_SCALE_BOOST,
@@ -92,9 +102,13 @@ export class VegetationLayer implements LayerController {
   private grassPatchLoadPromise: Promise<void> | null = null
   private leafyTreeLoadPromise: Promise<void> | null = null
   private lowPolyWideTreeLoadPromise: Promise<void> | null = null
+  private lowpolyTreeLoadPromise: Promise<void> | null = null
+  private leafTreeLoadPromise: Promise<void> | null = null
+  private largestCanopyTreeLoadPromise: Promise<void> | null = null
   private flowerBushLoadPromise: Promise<void> | null = null
   private lowPolyFlowerLoadPromise: Promise<void> | null = null
   private currentTreeModelVariant: TreeModelVariant = 'base'
+  private currentRabbitNeighborTreeVariant: RabbitNeighborTreeVariant = 'default'
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -164,6 +178,24 @@ export class VegetationLayer implements LayerController {
       })
     }
 
+    if (!this.lowpolyTreeLoadPromise) {
+      this.lowpolyTreeLoadPromise = preloadLowpolyTreeTemplate().then(() => {
+        this.attachTreeInstances()
+      })
+    }
+
+    if (!this.leafTreeLoadPromise) {
+      this.leafTreeLoadPromise = preloadLeafTreeTemplate().then(() => {
+        this.attachTreeInstances()
+      })
+    }
+
+    if (!this.largestCanopyTreeLoadPromise) {
+      this.largestCanopyTreeLoadPromise = preloadLargestCanopyTreeTemplate().then(() => {
+        this.attachTreeInstances()
+      })
+    }
+
     if (!this.flowerBushLoadPromise) {
       this.flowerBushLoadPromise = preloadFlowerBushTemplate().then(() => {
         this.attachFlowerBushInstances()
@@ -180,6 +212,9 @@ export class VegetationLayer implements LayerController {
       this.grassPatchLoadPromise,
       this.leafyTreeLoadPromise,
       this.lowPolyWideTreeLoadPromise,
+      this.lowpolyTreeLoadPromise,
+      this.leafTreeLoadPromise,
+      this.largestCanopyTreeLoadPromise,
       this.flowerBushLoadPromise,
       this.lowPolyFlowerLoadPromise,
     ]).then(() => undefined)
@@ -198,12 +233,22 @@ export class VegetationLayer implements LayerController {
     const stageThreeTuning = input.stageIndex >= 3 ? getStageThreeDayTuning(input.dayCount) : null
     const nextTreeModelVariant =
       input.stageIndex >= 5 ? getStageFiveTreeDayTuning(input.dayCount).treeModelVariant : 'base'
+    const nextRabbitNeighborTreeVariant: RabbitNeighborTreeVariant =
+      input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY ? 'largestCanopy' : 'default'
     const persistedStageTwoTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).vegetation : null
     const inheritedVegetationTuning = stageTwoTuning ?? persistedStageTwoTuning
 
+    let shouldReattachTrees = false
     if (nextTreeModelVariant !== this.currentTreeModelVariant) {
       this.currentTreeModelVariant = nextTreeModelVariant
-      // 第 54 天触发树模型统一升级时，重新挂载全部树实例以保持“全量替换”。
+      shouldReattachTrees = true
+    }
+    if (nextRabbitNeighborTreeVariant !== this.currentRabbitNeighborTreeVariant) {
+      this.currentRabbitNeighborTreeVariant = nextRabbitNeighborTreeVariant
+      shouldReattachTrees = true
+    }
+    if (shouldReattachTrees) {
+      // 第 45 天起替换兔子旁边那棵树，第 54 天起继续叠加树模型统一升级，两个切换点都要重挂树实例。
       this.attachTreeInstances()
     }
 
@@ -226,7 +271,13 @@ export class VegetationLayer implements LayerController {
         ? 0.3 * GRASS_PATCH_SCALE_BOOST
         : inheritedVegetationTuning?.grassPatchScale ?? null
     const visibleTreeCount =
-      input.stageIndex === 1 ? 0 : stageThreeTuning != null ? 3 : inheritedVegetationTuning?.treeCount ?? 0
+      input.stageIndex === 1
+        ? 0
+        : input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY
+          ? 4
+          : stageThreeTuning != null
+            ? 3
+            : inheritedVegetationTuning?.treeCount ?? 0
     const visibleFlowerBushCount = stageThreeTuning?.flowerBushCount ?? 0
     const visibleLowPolyFlowerCount =
       input.stageIndex >= 4 && input.dayCount >= 29
@@ -368,11 +419,12 @@ export class VegetationLayer implements LayerController {
     const anchors = [
       // 帐篷左侧直杆树（勿删）
       { phi: 0.48, theta: 5.72 },
-      // 帐篷右侧直杆树（勿删）
+      // 帐篷右侧靠内松树（勿删）
       { phi: 0.4, theta: 3.7 },
-      // 帐篷右侧多枝干树（勿删）
-      { phi: 0.48, theta: 2.62 },
-      { phi: 0.24, theta: 4.8 },
+      // 帐篷右侧靠外松树（勿删）
+      { phi: 0.46, theta: 2.32 },
+      // 帐篷右侧中间大松树（勿删）
+      { phi: 0.48, theta: 3.16 },
     ]
 
     return anchors.map((anchor, index) => {
@@ -553,11 +605,53 @@ export class VegetationLayer implements LayerController {
     this.trees.forEach((tree, index) => {
       tree.clear()
       tree.userData.treeModelVariant = this.currentTreeModelVariant
+      tree.userData.treeAssetKey = 'leafy'
+      if (index === 2 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+        tree.userData.treeAssetKey = 'lowpoly-tree'
+        tree.add(
+          createLowpolyTreeInstance({
+            targetHeight: treeHeights.wide,
+            rotationY: 0.35,
+          }),
+        )
+        return
+      }
       if (index === 2) {
+        tree.userData.treeAssetKey = 'wide'
         tree.add(
           createLowPolyWideTreeInstance({
             targetHeight: treeHeights.wide,
             rotationY: 0.35,
+          }),
+        )
+        return
+      }
+      if (index === 1 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+        tree.userData.treeAssetKey = 'lowpoly-tree'
+        tree.add(
+          createLowpolyTreeInstance({
+            targetHeight: treeHeights.rightTall,
+            rotationY: index * 0.9,
+          }),
+        )
+        return
+      }
+      if (index === 3 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+        tree.userData.treeAssetKey = 'leaf-tree'
+        tree.add(
+          createLeafTreeInstance({
+            targetHeight: treeHeights.farTall*1.8,
+            rotationY: 0.2,
+          }),
+        )
+        return
+      }
+      if (index === 0 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+        tree.userData.treeAssetKey = 'largest-canopy'
+        tree.add(
+          createLargestCanopyTreeInstance({
+            targetHeight: treeHeights.leftTall * RABBIT_NEIGHBOR_TREE_HEIGHT_MULTIPLIER,
+            rotationY: index * 0.9,
           }),
         )
         return
