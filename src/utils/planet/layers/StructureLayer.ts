@@ -93,7 +93,7 @@ const RABBIT_LEFT_OFFSET = 0.52
 // 控制水平朝向
 const RABBIT_YAW_OFFSET = -1
 // 控制秋千模型整体大小
-const SWING_MODEL_TARGET_HEIGHT = 0.92
+const SWING_MODEL_TARGET_HEIGHT = 1.02
 // 控制秋千离地高度
 const SWING_SURFACE_CLEARANCE = 0.02
 // 控制秋千相对房屋的前后位置
