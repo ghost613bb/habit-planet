@@ -1,9 +1,4 @@
-import {
-  Group,
-  Mesh,
-  SphereGeometry,
-  Vector3,
-} from 'three'
+import { Group, Mesh, SphereGeometry, Vector3 } from 'three'
 
 import { mats } from '../assets/Materials'
 import { getSurfaceTransform } from '../math/PlanetMath'
@@ -25,7 +20,6 @@ export class CharacterLayer implements LayerController {
   private group: Group
   private deer: Group
   private birds: Group[] = []
-  private butterflies: Group[] = []
 
   constructor(options: CharacterLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -35,11 +29,9 @@ export class CharacterLayer implements LayerController {
 
     this.deer = this.createDeer()
     this.birds = this.createBirds()
-    this.butterflies = this.createButterflies()
 
     this.group.add(this.deer)
     this.birds.forEach((item) => this.group.add(item))
-    this.butterflies.forEach((item) => this.group.add(item))
   }
 
   preload(): Promise<void> {
@@ -51,6 +43,7 @@ export class CharacterLayer implements LayerController {
   }
 
   update(input: LayerUpdateInput) {
+    this.group.visible = true
     const shouldHoldStageThreeEndState =
       input.dayCount >= STAGE_THREE_END_STATE_START_DAY &&
       input.dayCount <= STAGE_THREE_END_STATE_END_DAY
@@ -59,14 +52,9 @@ export class CharacterLayer implements LayerController {
 
     const showBirds =
       input.stageIndex >= 5 && input.qualityTier !== 'tier-0' && !shouldHoldStageThreeEndState
-    const showButterflies =
-      input.stageIndex >= 5 && input.qualityTier === 'tier-2' && !shouldHoldStageThreeEndState
 
     this.birds.forEach((item) => {
       item.visible = showBirds
-    })
-    this.butterflies.forEach((item) => {
-      item.visible = showButterflies
     })
   }
 
@@ -77,12 +65,6 @@ export class CharacterLayer implements LayerController {
       if (!bird.visible) return
       bird.position.y += Math.sin(t * 2 + index) * 0.0008
       bird.rotation.z = Math.sin(t * 3 + index) * 0.12
-    })
-
-    this.butterflies.forEach((butterfly, index) => {
-      if (!butterfly.visible) return
-      butterfly.position.y += Math.sin(t * 3.5 + index * 0.8) * 0.001
-      butterfly.rotation.z = Math.sin(t * 6 + index) * 0.22
     })
   }
 
@@ -121,33 +103,5 @@ export class CharacterLayer implements LayerController {
   private createBirds() {
     // 先移除这套叶片样式的飞鸟占位，后续如需替换再接入新飞行模型。
     return []
-  }
-
-  private createButterflies() {
-    const anchors = [
-      { phi: 0.2, theta: 3.3 },
-      { phi: 0.16, theta: 4.4 },
-    ]
-
-    return anchors.map((anchor) => {
-      const butterfly = new Group()
-      const wingLeft = new Mesh(new SphereGeometry(0.04, 8, 8), mats.flowerPetal)
-      wingLeft.scale.set(1.4, 0.8, 0.4)
-      wingLeft.position.set(-0.03, 0, -0.03)
-      const wingRight = new Mesh(new SphereGeometry(0.04, 8, 8), mats.flowerPetal)
-      wingRight.scale.set(1.4, 0.8, 0.4)
-      wingRight.position.set(-0.03, 0, 0.03)
-      butterfly.add(wingLeft, wingRight)
-
-      const { pos, quaternion } = getSurfaceTransform(
-        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius + 0.42,
-      )
-      butterfly.position.copy(pos)
-      butterfly.quaternion.copy(quaternion)
-      butterfly.visible = false
-
-      return butterfly
-    })
   }
 }
