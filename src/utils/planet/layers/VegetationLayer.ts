@@ -36,7 +36,7 @@ import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
 import { getPlacementTransform, getSurfaceTransformWithClearance } from '../math/PlanetMath'
 import type { LayerController, LayerUpdateInput } from './contracts'
-import { isGrassPatchBlockedByTent } from './StructureLayer'
+import { isGrassPatchBlockedBySwing, isGrassPatchBlockedByTent } from './StructureLayer'
 import { isGrassPatchBlockedByWoodPlankPath } from './woodPlankPath'
 
 type VegetationLayerOptions = {
@@ -106,7 +106,7 @@ const BUSH_BASE_ANCHORS: BushAnchor[] = [
 // 花朵继续复用草簇锚点，但优先选择远离木板路径与中轴通道的位置，避免贴近木块模型。
 const LOW_POLY_FLOWER_BASE_GRASS_PATCH_INDICES = [20, 33, 40, 47, 54, 60, 67, 73, 79, 84, 88, 91, 94, 97] as const
 const LOW_POLY_FLOWER_TREE_AVOIDING_GRASS_PATCH_INDICES = [
-  81, 93, 29, 44, 41, 76, 49, 85, 80, 31, 28, 50, 52, 92,
+  81, 29, 18, 84, 85, 91, 39, 92, 93, 26, 96, 97, 64, 80,
 ] as const
 
 export class VegetationLayer implements LayerController {
@@ -376,7 +376,10 @@ export class VegetationLayer implements LayerController {
     for (let i = 0; i < this.lowPolyFlowers.length; i += 1) {
       const flower = this.lowPolyFlowers[i]
       if (!flower) continue
-      flower.visible = i < visibleLowPolyFlowerCount
+      const flowerNormal = flower.userData.pathAnchorNormal as Vector3 | undefined
+      const blockedBySwing =
+        flowerNormal != null && isGrassPatchBlockedBySwing(flowerNormal, input.dayCount, this.planetRadius)
+      flower.visible = i < visibleLowPolyFlowerCount && !blockedBySwing
     }
   }
 

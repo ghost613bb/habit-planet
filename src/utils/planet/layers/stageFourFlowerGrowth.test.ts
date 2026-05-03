@@ -2,7 +2,7 @@ import { Group, Object3D, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { CAMPFIRE_SURFACE_PHI, CAMPFIRE_SURFACE_THETA } from './campfirePlacement'
-import { isGrassPatchBlockedByTent } from './StructureLayer'
+import { isGrassPatchBlockedBySwing, isGrassPatchBlockedByTent } from './StructureLayer'
 import { VegetationLayer } from './VegetationLayer'
 import { isGrassPatchBlockedByWoodPlankPath } from './woodPlankPath'
 
@@ -195,6 +195,44 @@ describe('第四阶段花朵累积', () => {
       const flowerNormal = flower.userData.pathAnchorNormal as Vector3 | undefined
       expect(isGrassPatchBlockedByTent(flowerNormal ?? new Vector3(0, 1, 0), 35, 3)).toBe(false)
       expect((flowerNormal ?? new Vector3(0, 1, 0)).angleTo(campfireNormal)).toBeGreaterThan(0.3)
+    })
+  })
+
+  it('第 65 天秋千出现后，会隐藏秋千附近当前可见的小花', async () => {
+    const parentGroup = new Group()
+    const vegetationLayer = new VegetationLayer({
+      parentGroup,
+      planetRadius: 3,
+    })
+
+    await vegetationLayer.preload()
+    vegetationLayer.update({
+      dayCount: 46,
+      stageIndex: 5 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const visibleFlowersBeforeSwing = ((vegetationLayer as any).lowPolyFlowers as Group[]).filter(
+      (item) => item.visible,
+    )
+    expect(visibleFlowersBeforeSwing).toHaveLength(14)
+
+    vegetationLayer.update({
+      dayCount: 65,
+      stageIndex: 5 as const,
+      stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const visibleFlowersAfterSwing = ((vegetationLayer as any).lowPolyFlowers as Group[]).filter(
+      (item) => item.visible,
+    )
+    expect(visibleFlowersAfterSwing.length).toBeLessThan(14)
+    expect(visibleFlowersAfterSwing.length).toBeGreaterThan(0)
+    visibleFlowersAfterSwing.forEach((flower) => {
+      const flowerNormal = flower.userData.pathAnchorNormal as Vector3 | undefined
+      expect(isGrassPatchBlockedBySwing(flowerNormal ?? new Vector3(0, 1, 0), 65, 3)).toBe(false)
     })
   })
 })

@@ -103,6 +103,7 @@ const SWING_FRONT_OFFSET = -0.1
 const SWING_LEFT_OFFSET = 0.6
 // 控制秋千的水平朝向
 const SWING_YAW_OFFSET = -0.5
+const SWING_FLOWER_CLEARANCE_ANGLE = 0.24
 const CABIN_SURFACE_CLEARANCE_MICRO_FACTOR = 1 / 6
 const CABIN_INSTANCE_SINK_OFFSET = 0.45
 const CABIN_SURFACE_CLEARANCE_BASELINE =
@@ -224,6 +225,15 @@ export function isGrassPatchBlockedByTent(normal: Vector3, dayCount: number, pla
     safeNormal.angleTo(tentSurfaceNormal) <= TENT_GRASS_CLEARANCE_ANGLE ||
     safeNormal.angleTo(rightTentSurfaceNormal) <= TENT_GRASS_CLEARANCE_ANGLE
   )
+}
+
+export function isGrassPatchBlockedBySwing(normal: Vector3, dayCount: number, planetRadius: number) {
+  if (dayCount < SWING_APPEAR_START_DAY) return false
+
+  const safeNormal = normal.clone().normalize()
+  const { swingSurfaceNormal } = getSwingPlacementData(planetRadius)
+
+  return safeNormal.angleTo(swingSurfaceNormal) <= SWING_FLOWER_CLEARANCE_ANGLE
 }
 
 export class StructureLayer implements LayerController {
