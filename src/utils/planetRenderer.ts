@@ -221,11 +221,11 @@ export function createPlanetRenderer(input: {
     const span = Math.max(0.001, controls.maxDistance - controls.minDistance)
     const zoomRatio = Math.max(0, Math.min(1, (distance - controls.minDistance) / span))
 
-    // 相机越靠近星球，越收敛主光和高光，避免放大时把表面细节洗白。
-    const ambientFactor = 0.82 + zoomRatio * 0.18
-    const sunFactor = 0.72 + zoomRatio * 0.28
-    const moonFactor = 0.88 + zoomRatio * 0.12
-    const spotFactor = 0.18 + zoomRatio * 0.82
+    // 近景保留更多暖光，避免一放大就发暗；同时压低冷色辅光，减少偏灰感。
+    const ambientFactor = 0.9 + zoomRatio * 0.1
+    const sunFactor = 0.84 + zoomRatio * 0.16
+    const moonFactor = 0.66 + zoomRatio * 0.34
+    const spotFactor = 0.42 + zoomRatio * 0.58
 
     lights.ambientLight.intensity = baseLightIntensities.ambient * ambientFactor
     lights.sunLight.intensity = baseLightIntensities.sun * sunFactor
