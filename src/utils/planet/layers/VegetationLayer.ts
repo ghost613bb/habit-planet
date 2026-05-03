@@ -3,6 +3,7 @@ import {
   CylinderGeometry,
   Group,
   LoadingManager,
+  Material,
   MeshStandardMaterial,
   Mesh,
   SphereGeometry,
@@ -598,6 +599,38 @@ export class VegetationLayer implements LayerController {
     })
   }
 
+  private createMatteTreeMaterial(material: Material) {
+    if (!(material instanceof MeshStandardMaterial)) return material
+
+    const matteMaterial = material.clone()
+    matteMaterial.metalness = 0
+    matteMaterial.roughness = 1
+    matteMaterial.envMapIntensity = 0
+    matteMaterial.needsUpdate = true
+
+    return matteMaterial
+  }
+
+  private applyMatteTreeMaterial(treeInstance: Group) {
+    treeInstance.traverse((child) => {
+      if (!(child instanceof Mesh)) return
+
+      const material = child.material
+      if (Array.isArray(material)) {
+        child.material = material.map((entry) => this.createMatteTreeMaterial(entry))
+        return
+      }
+
+      child.material = this.createMatteTreeMaterial(material)
+    })
+  }
+
+  private addMatteTreeInstance(tree: Group, assetKey: string, instance: Group) {
+    tree.userData.treeAssetKey = assetKey
+    this.applyMatteTreeMaterial(instance)
+    tree.add(instance)
+  }
+
   private attachTreeInstances() {
     const treeHeights =
       this.currentTreeModelVariant === 'refined' ? REFINED_TREE_TARGET_HEIGHTS : BASE_TREE_TARGET_HEIGHTS
@@ -607,8 +640,9 @@ export class VegetationLayer implements LayerController {
       tree.userData.treeModelVariant = this.currentTreeModelVariant
       tree.userData.treeAssetKey = 'leafy'
       if (index === 2 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
-        tree.userData.treeAssetKey = 'lowpoly-tree'
-        tree.add(
+        this.addMatteTreeInstance(
+          tree,
+          'lowpoly-tree',
           createLowpolyTreeInstance({
             targetHeight: treeHeights.wide,
             rotationY: 0.35,
@@ -617,8 +651,9 @@ export class VegetationLayer implements LayerController {
         return
       }
       if (index === 2) {
-        tree.userData.treeAssetKey = 'wide'
-        tree.add(
+        this.addMatteTreeInstance(
+          tree,
+          'wide',
           createLowPolyWideTreeInstance({
             targetHeight: treeHeights.wide,
             rotationY: 0.35,
@@ -627,8 +662,9 @@ export class VegetationLayer implements LayerController {
         return
       }
       if (index === 1 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
-        tree.userData.treeAssetKey = 'lowpoly-tree'
-        tree.add(
+        this.addMatteTreeInstance(
+          tree,
+          'lowpoly-tree',
           createLowpolyTreeInstance({
             targetHeight: treeHeights.rightTall,
             rotationY: index * 0.9,
@@ -637,18 +673,20 @@ export class VegetationLayer implements LayerController {
         return
       }
       if (index === 3 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
-        tree.userData.treeAssetKey = 'leaf-tree'
-        tree.add(
+        this.addMatteTreeInstance(
+          tree,
+          'leaf-tree',
           createLeafTreeInstance({
-            targetHeight: treeHeights.farTall*1.8,
+            targetHeight: treeHeights.farTall * 1.8,
             rotationY: 0.2,
           }),
         )
         return
       }
       if (index === 0 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
-        tree.userData.treeAssetKey = 'largest-canopy'
-        tree.add(
+        this.addMatteTreeInstance(
+          tree,
+          'largest-canopy',
           createLargestCanopyTreeInstance({
             targetHeight: treeHeights.leftTall * RABBIT_NEIGHBOR_TREE_HEIGHT_MULTIPLIER,
             rotationY: index * 0.9,
@@ -657,9 +695,16 @@ export class VegetationLayer implements LayerController {
         return
       }
 
-      tree.add(
+      this.addMatteTreeInstance(
+        tree,
+        'leafy',
         createLeafyTreeInstance({
-          targetHeight: index === 0 ? treeHeights.leftTall : index === 1 ? treeHeights.rightTall : treeHeights.farTall,
+          targetHeight:
+            index === 0
+              ? treeHeights.leftTall
+              : index === 1
+                ? treeHeights.rightTall
+                : treeHeights.farTall,
           rotationY: index * 0.9,
         }),
       )

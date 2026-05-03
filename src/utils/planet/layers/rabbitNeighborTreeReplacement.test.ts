@@ -1,9 +1,36 @@
-import { Group } from 'three'
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { VegetationLayer } from './VegetationLayer'
 
 describe('兔子旁边树模型替换', () => {
+  it('树模型会把 Standard 材质压成哑光，避免风车旁树叶出现反光高光', () => {
+    const vegetationLayer = new VegetationLayer({
+      parentGroup: new Group(),
+      planetRadius: 3,
+    })
+    const treeInstance = new Group()
+    const glossyMaterial = new MeshStandardMaterial({
+      color: '#88cc77',
+      metalness: 0.65,
+      roughness: 0.18,
+      envMapIntensity: 1.4,
+    })
+    const canopy = new Mesh(new BoxGeometry(0.6, 0.8, 0.6), glossyMaterial)
+    treeInstance.add(canopy)
+
+    ;(vegetationLayer as any).applyMatteTreeMaterial(treeInstance)
+
+    const matteMaterial = canopy.material
+    expect(matteMaterial).toBeInstanceOf(MeshStandardMaterial)
+    expect(matteMaterial).not.toBe(glossyMaterial)
+    if (!(matteMaterial instanceof MeshStandardMaterial)) return
+
+    expect(matteMaterial.metalness).toBe(0)
+    expect(matteMaterial.roughness).toBe(1)
+    expect(matteMaterial.envMapIntensity).toBe(0)
+  })
+
   it('第 45 天起会把兔子最近的树替换成最大树冠树，并延续到后续天数', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
