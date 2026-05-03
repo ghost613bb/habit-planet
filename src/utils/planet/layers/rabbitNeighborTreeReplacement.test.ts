@@ -31,7 +31,7 @@ describe('兔子旁边树模型替换', () => {
     expect(matteMaterial.envMapIntensity).toBe(0)
   })
 
-  it('第 45 天起会把兔子最近的树替换成最大树冠树，并延续到后续天数', async () => {
+  it('第 45 天起会按既定节奏逐步替换树模型，并在第 57 天补上第 4 棵树', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -77,13 +77,16 @@ describe('兔子旁边树模型替换', () => {
     const insertedLeafTreeAtDayFortyFive = visibleTreesAtDayFortyFive[3]
     const rabbitNeighborInstanceAtDayFortyFive = rabbitNeighborTreeAtDayFortyFive?.children[0]
 
-    expect(visibleTreesAtDayFortyFive).toHaveLength(4)
+    expect(visibleTreesAtDayFortyFive).toHaveLength(3)
     expect(rabbitNeighborTreeAtDayFortyFive?.userData.treeAssetKey).toBe('largest-canopy')
-    expect(secondTreeAtDayFortyFive?.userData.treeAssetKey).toBe('lowpoly-tree')
-    expect(thirdTreeAtDayFortyFive?.userData.treeAssetKey).toBe('lowpoly-tree')
-    expect(insertedLeafTreeAtDayFortyFive?.userData.treeAssetKey).toBe('leaf-tree')
+    expect(secondTreeAtDayFortyFive?.userData.treeAssetKey).toBe('leafy')
+    expect(thirdTreeAtDayFortyFive?.userData.treeAssetKey).toBe('wide')
+    expect(insertedLeafTreeAtDayFortyFive).toBeUndefined()
     expect(rabbitNeighborInstanceAtDayFortyFive).toBeTruthy()
     expect(rabbitNeighborInstanceAtDayFortyFive).not.toBe(rabbitNeighborInstanceBeforeReplacement)
+    expect(rabbitNeighborTreeAtDayFortyFive?.userData.treeModelVariant).toBe('refined')
+    expect(secondTreeAtDayFortyFive?.userData.treeModelVariant).toBe('base')
+    expect(thirdTreeAtDayFortyFive?.userData.treeModelVariant).toBe('base')
 
     vegetationLayer.update({
       dayCount: 46,
@@ -98,29 +101,60 @@ describe('兔子旁边树模型替换', () => {
     const thirdTreeAtDayFortySix = visibleTreesAtDayFortySix[2]
     const insertedLeafTreeAtDayFortySix = visibleTreesAtDayFortySix[3]
 
+    expect(visibleTreesAtDayFortySix).toHaveLength(3)
     expect(rabbitNeighborTreeAtDayFortySix?.userData.treeAssetKey).toBe('largest-canopy')
-    expect(secondTreeAtDayFortySix?.userData.treeAssetKey).toBe('lowpoly-tree')
-    expect(thirdTreeAtDayFortySix?.userData.treeAssetKey).toBe('lowpoly-tree')
-    expect(insertedLeafTreeAtDayFortySix?.userData.treeAssetKey).toBe('leaf-tree')
-    expect(rabbitNeighborTreeAtDayFortySix?.userData.treeModelVariant).toBe('base')
+    expect(secondTreeAtDayFortySix?.userData.treeAssetKey).toBe('leafy')
+    expect(thirdTreeAtDayFortySix?.userData.treeAssetKey).toBe('wide')
+    expect(insertedLeafTreeAtDayFortySix).toBeUndefined()
+    expect(rabbitNeighborTreeAtDayFortySix?.userData.treeModelVariant).toBe('refined')
+    expect(secondTreeAtDayFortySix?.userData.treeModelVariant).toBe('base')
+    expect(thirdTreeAtDayFortySix?.userData.treeModelVariant).toBe('base')
 
     vegetationLayer.update({
-      dayCount: 54,
+      dayCount: 48,
       stageIndex: 5 as const,
-      stageProgress: 0.2,
+      stageProgress: 0.05,
       qualityTier: 'tier-1' as const,
     })
 
-    const visibleTreesAtDayFiftyFour = getVisibleTrees()
-    const rabbitNeighborTreeAtDayFiftyFour = visibleTreesAtDayFiftyFour[0]
-    const secondTreeAtDayFiftyFour = visibleTreesAtDayFiftyFour[1]
-    const thirdTreeAtDayFiftyFour = visibleTreesAtDayFiftyFour[2]
-    const insertedLeafTreeAtDayFiftyFour = visibleTreesAtDayFiftyFour[3]
+    const visibleTreesAtDayFortyEight = getVisibleTrees()
+    expect(visibleTreesAtDayFortyEight).toHaveLength(3)
+    expect(visibleTreesAtDayFortyEight[0]?.userData.treeAssetKey).toBe('largest-canopy')
+    expect(visibleTreesAtDayFortyEight[1]?.userData.treeAssetKey).toBe('lowpoly-tree')
+    expect(visibleTreesAtDayFortyEight[2]?.userData.treeAssetKey).toBe('wide')
+    expect(visibleTreesAtDayFortyEight.map((item) => item.userData.treeModelVariant)).toEqual([
+      'refined',
+      'refined',
+      'base',
+    ])
 
-    expect(rabbitNeighborTreeAtDayFiftyFour?.userData.treeAssetKey).toBe('largest-canopy')
-    expect(secondTreeAtDayFiftyFour?.userData.treeAssetKey).toBe('lowpoly-tree')
-    expect(thirdTreeAtDayFiftyFour?.userData.treeAssetKey).toBe('lowpoly-tree')
-    expect(insertedLeafTreeAtDayFiftyFour?.userData.treeAssetKey).toBe('leaf-tree')
-    expect(rabbitNeighborTreeAtDayFiftyFour?.userData.treeModelVariant).toBe('refined')
+    vegetationLayer.update({
+      dayCount: 53,
+      stageIndex: 5 as const,
+      stageProgress: 0.18,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const visibleTreesAtDayFiftyThree = getVisibleTrees()
+    expect(visibleTreesAtDayFiftyThree).toHaveLength(3)
+    expect(visibleTreesAtDayFiftyThree[0]?.userData.treeAssetKey).toBe('largest-canopy')
+    expect(visibleTreesAtDayFiftyThree[1]?.userData.treeAssetKey).toBe('lowpoly-tree')
+    expect(visibleTreesAtDayFiftyThree[2]?.userData.treeAssetKey).toBe('lowpoly-tree')
+    expect(visibleTreesAtDayFiftyThree.every((item) => item.userData.treeModelVariant === 'refined')).toBe(true)
+
+    vegetationLayer.update({
+      dayCount: 57,
+      stageIndex: 5 as const,
+      stageProgress: 0.28,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const visibleTreesAtDayFiftySeven = getVisibleTrees()
+    expect(visibleTreesAtDayFiftySeven).toHaveLength(4)
+    expect(visibleTreesAtDayFiftySeven[0]?.userData.treeAssetKey).toBe('largest-canopy')
+    expect(visibleTreesAtDayFiftySeven[1]?.userData.treeAssetKey).toBe('lowpoly-tree')
+    expect(visibleTreesAtDayFiftySeven[2]?.userData.treeAssetKey).toBe('lowpoly-tree')
+    expect(visibleTreesAtDayFiftySeven[3]?.userData.treeAssetKey).toBe('leaf-tree')
+    expect(visibleTreesAtDayFiftySeven.every((item) => item.userData.treeModelVariant === 'refined')).toBe(true)
   })
 })

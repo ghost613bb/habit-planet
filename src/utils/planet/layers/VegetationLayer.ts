@@ -30,7 +30,11 @@ import { createLeafTreeInstance, preloadLeafTreeTemplate } from '../assets/LeafT
 import { createLeafyTreeInstance, preloadLeafyTreeTemplate } from '../assets/LeafyTree'
 import { createLowpolyTreeInstance, preloadLowpolyTreeTemplate } from '../assets/LowpolyTree'
 import { createLowPolyWideTreeInstance, preloadLowPolyWideTreeTemplate } from '../assets/LowPolyWideTree'
-import { getStageFiveTreeDayTuning, type TreeModelVariant } from '../config/stageFiveTreeDayTuning'
+import {
+  getStageFiveTreeDayTuning,
+  type StageFiveTreeDayTuning,
+  type TreeModelVariant,
+} from '../config/stageFiveTreeDayTuning'
 import { getStageFourFlowerDayTuning } from '../config/stageFourFlowerDayTuning'
 import { getStageThreeDayTuning } from '../config/stageThreeDayTuning'
 import { getStageTwoDayTuning } from '../config/stageTwoDayTuning'
@@ -131,7 +135,8 @@ export class VegetationLayer implements LayerController {
   private largestCanopyTreeLoadPromise: Promise<void> | null = null
   private flowerBushLoadPromise: Promise<void> | null = null
   private lowPolyFlowerLoadPromise: Promise<void> | null = null
-  private currentTreeModelVariant: TreeModelVariant = 'base'
+  private currentStageFiveTreeTuning: StageFiveTreeDayTuning | null = null
+  private currentRefinedTreeIndicesKey = ''
   private currentRabbitNeighborTreeVariant: RabbitNeighborTreeVariant = 'default'
   private currentFlowerPlacementVariant: FlowerPlacementVariant = 'base'
 
@@ -256,8 +261,9 @@ export class VegetationLayer implements LayerController {
     const stageOneDay = input.stageIndex === 1 ? Math.max(1, Math.floor(input.dayCount)) : null
     const stageTwoTuning = input.stageIndex === 2 ? getStageTwoDayTuning(input.dayCount).vegetation : null
     const stageThreeTuning = input.stageIndex >= 3 ? getStageThreeDayTuning(input.dayCount) : null
-    const nextTreeModelVariant =
-      input.stageIndex >= 5 ? getStageFiveTreeDayTuning(input.dayCount).treeModelVariant : 'base'
+    const nextStageFiveTreeTuning =
+      input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY ? getStageFiveTreeDayTuning(input.dayCount) : null
+    const nextRefinedTreeIndicesKey = nextStageFiveTreeTuning?.refinedTreeIndices.join(',') ?? ''
     const nextRabbitNeighborTreeVariant: RabbitNeighborTreeVariant =
       input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY ? 'largestCanopy' : 'default'
     const nextFlowerPlacementVariant = this.getFlowerPlacementVariant(input.dayCount)
@@ -265,16 +271,19 @@ export class VegetationLayer implements LayerController {
     const inheritedVegetationTuning = stageTwoTuning ?? persistedStageTwoTuning
 
     let shouldReattachTrees = false
-    if (nextTreeModelVariant !== this.currentTreeModelVariant) {
-      this.currentTreeModelVariant = nextTreeModelVariant
+    if (nextRefinedTreeIndicesKey !== this.currentRefinedTreeIndicesKey) {
+      this.currentRefinedTreeIndicesKey = nextRefinedTreeIndicesKey
+      this.currentStageFiveTreeTuning = nextStageFiveTreeTuning
       shouldReattachTrees = true
+    } else {
+      this.currentStageFiveTreeTuning = nextStageFiveTreeTuning
     }
     if (nextRabbitNeighborTreeVariant !== this.currentRabbitNeighborTreeVariant) {
       this.currentRabbitNeighborTreeVariant = nextRabbitNeighborTreeVariant
       shouldReattachTrees = true
     }
     if (shouldReattachTrees) {
-      // 第 45 天起替换兔子旁边那棵树，第 54 天起继续叠加树模型统一升级，两个切换点都要重挂树实例。
+      // 第 45 天起逐棵替换树模型，第 57 天再补上第 4 棵树，这些切换点都要重挂树实例。
       this.attachTreeInstances()
     }
     if (nextFlowerPlacementVariant !== this.currentFlowerPlacementVariant) {
@@ -304,8 +313,8 @@ export class VegetationLayer implements LayerController {
     const visibleTreeCount =
       input.stageIndex === 1
         ? 0
-        : input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY
-          ? 4
+        : nextStageFiveTreeTuning != null
+          ? nextStageFiveTreeTuning.visibleTreeCount
           : stageThreeTuning != null
             ? 3
             : inheritedVegetationTuning?.treeCount ?? 0
@@ -700,15 +709,23 @@ export class VegetationLayer implements LayerController {
     tree.add(instance)
   }
 
-  private attachTreeInstances() {
-    const treeHeights =
-      this.currentTreeModelVariant === 'refined' ? REFINED_TREE_TARGET_HEIGHTS : BASE_TREE_TARGET_HEIGHTS
+  private getTreeModelVariantByIndex(index: number): TreeModelVariant {
+    return this.currentStageFiveTreeTuning?.refinedTreeIndices.includes(index as 0 | 1 | 2 | 3)
+      ? 'refined'
+      : 'base'
+  }
 
+  private attachTreeInstances() {
     this.trees.forEach((tree, index) => {
       tree.clear()
-      tree.userData.treeModelVariant = this.currentTreeModelVariant
+      const treeModelVariant = this.getTreeModelVariantByIndex(index)
+      const treeHeights = treeModelVariant === 'refined' ? REFINED_TREE_TARGET_HEIGHTS : BASE_TREE_TARGET_HEIGHTS
+      const shouldUseRefinedTreeAsset =
+        this.currentRabbitNeighborTreeVariant === 'largestCanopy' && treeModelVariant === 'refined'
+
+      tree.userData.treeModelVariant = treeModelVariant
       tree.userData.treeAssetKey = 'leafy'
-      if (index === 2 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+      if (index === 2 && shouldUseRefinedTreeAsset) {
         this.addMatteTreeInstance(
           tree,
           'lowpoly-tree',
@@ -730,7 +747,7 @@ export class VegetationLayer implements LayerController {
         )
         return
       }
-      if (index === 1 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+      if (index === 1 && shouldUseRefinedTreeAsset) {
         this.addMatteTreeInstance(
           tree,
           'lowpoly-tree',
@@ -741,7 +758,7 @@ export class VegetationLayer implements LayerController {
         )
         return
       }
-      if (index === 3 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+      if (index === 3 && shouldUseRefinedTreeAsset) {
         this.addMatteTreeInstance(
           tree,
           'leaf-tree',
@@ -752,7 +769,7 @@ export class VegetationLayer implements LayerController {
         )
         return
       }
-      if (index === 0 && this.currentRabbitNeighborTreeVariant === 'largestCanopy') {
+      if (index === 0 && shouldUseRefinedTreeAsset) {
         this.addMatteTreeInstance(
           tree,
           'largest-canopy',

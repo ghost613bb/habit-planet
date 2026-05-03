@@ -16,29 +16,37 @@ export type StageFiveTreeDay =
   | 60
 
 export type TreeModelVariant = 'base' | 'refined'
+export type TreeIndex = 0 | 1 | 2 | 3
 
 export type StageFiveTreeDayTuning = {
-  treeModelVariant: TreeModelVariant
+  visibleTreeCount: 3 | 4
+  refinedTreeIndices: TreeIndex[]
 }
 
-export const TREE_MODEL_UPGRADE_DAY = 54
+export const TREE_REPLACEMENT_DAYS = {
+  firstTree: 45,
+  secondTree: 48,
+  thirdTree: 53,
+} as const
+
+export const TREE_ADDITION_DAY = 57
 
 export const STAGE_FIVE_TREE_DAY_TUNING: Record<StageFiveTreeDay, StageFiveTreeDayTuning> = {
-  46: { treeModelVariant: 'base' },
-  47: { treeModelVariant: 'base' },
-  48: { treeModelVariant: 'base' },
-  49: { treeModelVariant: 'base' },
-  50: { treeModelVariant: 'base' },
-  51: { treeModelVariant: 'base' },
-  52: { treeModelVariant: 'base' },
-  53: { treeModelVariant: 'base' },
-  54: { treeModelVariant: 'refined' },
-  55: { treeModelVariant: 'refined' },
-  56: { treeModelVariant: 'refined' },
-  57: { treeModelVariant: 'refined' },
-  58: { treeModelVariant: 'refined' },
-  59: { treeModelVariant: 'refined' },
-  60: { treeModelVariant: 'refined' },
+  46: { visibleTreeCount: 3, refinedTreeIndices: [0] },
+  47: { visibleTreeCount: 3, refinedTreeIndices: [0] },
+  48: { visibleTreeCount: 3, refinedTreeIndices: [0, 1] },
+  49: { visibleTreeCount: 3, refinedTreeIndices: [0, 1] },
+  50: { visibleTreeCount: 3, refinedTreeIndices: [0, 1] },
+  51: { visibleTreeCount: 3, refinedTreeIndices: [0, 1] },
+  52: { visibleTreeCount: 3, refinedTreeIndices: [0, 1] },
+  53: { visibleTreeCount: 3, refinedTreeIndices: [0, 1, 2] },
+  54: { visibleTreeCount: 3, refinedTreeIndices: [0, 1, 2] },
+  55: { visibleTreeCount: 3, refinedTreeIndices: [0, 1, 2] },
+  56: { visibleTreeCount: 3, refinedTreeIndices: [0, 1, 2] },
+  57: { visibleTreeCount: 4, refinedTreeIndices: [0, 1, 2, 3] },
+  58: { visibleTreeCount: 4, refinedTreeIndices: [0, 1, 2, 3] },
+  59: { visibleTreeCount: 4, refinedTreeIndices: [0, 1, 2, 3] },
+  60: { visibleTreeCount: 4, refinedTreeIndices: [0, 1, 2, 3] },
 }
 
 export function getStageFiveTreeDay(dayCount: number): StageFiveTreeDay {

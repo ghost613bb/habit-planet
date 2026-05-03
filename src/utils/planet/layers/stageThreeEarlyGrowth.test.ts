@@ -78,7 +78,7 @@ describe('阶段 3 早期（第 11-14 天）', () => {
     expect(trees.filter((item) => item.visible).length).toBe(3)
   })
 
-  it('第 22-44 天继续保留第 21 天的草簇、树与花丛，第 45 天起隐藏花丛并额外补一棵中间树', async () => {
+  it('第 22-44 天继续保留第 21 天的草簇、树与花丛，第 45 天起隐藏花丛并先替换左侧树模型', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -134,7 +134,7 @@ describe('阶段 3 早期（第 11-14 天）', () => {
     expect(dayTwentyTwoCounts).toEqual(dayTwentyOneCounts)
     expect(dayFortyFiveCounts).toEqual({
       ...dayTwentyOneCounts,
-      treeCount: 4,
+      treeCount: 3,
       flowerBushCount: 0,
     })
     expect((vegetationLayer as any).group.visible).toBe(true)

@@ -111,7 +111,7 @@ describe('第四阶段花朵累积', () => {
       (item) => item.userData.grassPatchIndex as number,
     )
 
-    expect(visibleTreesAtDayFortyFive).toHaveLength(4)
+    expect(visibleTreesAtDayFortyFive).toHaveLength(3)
     expect(visibleFlowersAtDayFortyFive).toHaveLength(14)
     expect(visibleFlowerBushesAtDayFortyFive).toHaveLength(0)
     dayThirtyFiveFlowerPositions.forEach((position, index) => {
