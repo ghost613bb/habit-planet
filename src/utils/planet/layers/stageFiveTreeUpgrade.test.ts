@@ -1,4 +1,4 @@
-import { Group, Mesh, MeshBasicMaterial } from 'three'
+import { Group } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { VegetationLayer } from './VegetationLayer'
@@ -82,7 +82,7 @@ describe('第五阶段树模型升级', () => {
     ])
   })
 
-  it('第 91 天主树升级为发光生命树，并仅保留放大与高光', async () => {
+  it('第 91 天主树升级为生命树，并保留放大效果', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -102,9 +102,7 @@ describe('第五阶段树模型升级', () => {
     const day90MainTree = trees[0]
     const day90Scale = day90MainTree?.scale.x ?? 0
     const day90TargetHeight = (day90MainTree?.userData.treeTargetHeight as number) ?? 0
-    const lifeTreeFxRoot = (vegetationLayer as any).lifeTreeFxRoot as Group
     expect(day90MainTree?.userData.treeAssetKey).toBe('largest-canopy')
-    expect(lifeTreeFxRoot.visible).toBe(false)
 
     vegetationLayer.update({
       dayCount: 91,
@@ -114,12 +112,8 @@ describe('第五阶段树模型升级', () => {
     })
 
     const day91MainTree = trees[0]
-    const glowCore = (vegetationLayer as any).lifeTreeGlowCore as Mesh
-    const glowCoreMaterial = glowCore.material as MeshBasicMaterial
     expect(day91MainTree?.userData.treeAssetKey).toBe('life-tree')
     expect((day91MainTree?.userData.treeTargetHeight as number) ?? 0).toBeGreaterThan(day90TargetHeight)
     expect((day91MainTree?.scale.x ?? 0)).toBeGreaterThan(day90Scale)
-    expect(lifeTreeFxRoot.visible).toBe(true)
-    expect(glowCoreMaterial.opacity).toBeGreaterThan(0.12)
   })
 })

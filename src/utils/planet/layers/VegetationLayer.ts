@@ -4,8 +4,6 @@ import {
   Group,
   LoadingManager,
   Material,
-  MeshBasicMaterial,
-  MeshLambertMaterial,
   MeshStandardMaterial,
   Mesh,
   SphereGeometry,
@@ -146,9 +144,6 @@ export class VegetationLayer implements LayerController {
   private currentMainTreeVisualVariant: MainTreeVisualVariant = 'default'
   private currentRabbitNeighborTreeVariant: RabbitNeighborTreeVariant = 'default'
   private currentFlowerPlacementVariant: FlowerPlacementVariant = 'base'
-  private lifeTreeFxRoot: Group
-  private lifeTreeGlowCore: Mesh
-  private lifeTreeGlowShell: Mesh
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -174,12 +169,6 @@ export class VegetationLayer implements LayerController {
 
     this.lowPolyFlowers = this.createLowPolyFlowerAnchors()
     this.lowPolyFlowers.forEach((item) => this.group.add(item))
-
-    const lifeTreeFx = this.createLifeTreeFx()
-    this.lifeTreeFxRoot = lifeTreeFx.root
-    this.lifeTreeGlowCore = lifeTreeFx.glowCore
-    this.lifeTreeGlowShell = lifeTreeFx.glowShell
-    this.group.add(this.lifeTreeFxRoot)
   }
 
   preload(): Promise<void> {
@@ -400,7 +389,6 @@ export class VegetationLayer implements LayerController {
       }
       tree.scale.setScalar(resolvedTreeScale)
     }
-    this.updateLifeTreeFx(input)
 
     for (let i = 0; i < this.flowerBushes.length; i += 1) {
       const flowerBush = this.flowerBushes[i]
@@ -420,7 +408,6 @@ export class VegetationLayer implements LayerController {
 
   deactivate() {
     this.group.visible = false
-    this.lifeTreeFxRoot.visible = false
     this.grassPatches.forEach((patch) => {
       patch.visible = false
     })
@@ -486,22 +473,6 @@ export class VegetationLayer implements LayerController {
     bush.quaternion.copy(quaternion)
   }
 
-  tick(elapsedMs: number) {
-    if (!this.lifeTreeFxRoot.visible) return
-
-    const t = elapsedMs * 0.001
-    const glowCoreMaterial = this.lifeTreeGlowCore.material
-    const glowShellMaterial = this.lifeTreeGlowShell.material
-    if (glowCoreMaterial instanceof MeshBasicMaterial) {
-      const baseOpacity = (this.lifeTreeGlowCore.userData.baseOpacity as number | undefined) ?? 0
-      glowCoreMaterial.opacity = baseOpacity * (0.92 + Math.sin(t * 2.4) * 0.08)
-    }
-    if (glowShellMaterial instanceof MeshBasicMaterial) {
-      const baseOpacity = (this.lifeTreeGlowShell.userData.baseOpacity as number | undefined) ?? 0
-      glowShellMaterial.opacity = baseOpacity * (0.88 + Math.sin(t * 1.9 + 0.6) * 0.12)
-    }
-  }
-
   private createTrees() {
     const anchors = [
       // 帐篷左侧直杆树（勿删）
@@ -529,73 +500,6 @@ export class VegetationLayer implements LayerController {
 
       return tree
     })
-  }
-
-  private createLifeTreeFx() {
-    const root = new Group()
-    root.visible = false
-    root.renderOrder = 4
-
-    const glowCore = new Mesh(
-      new SphereGeometry(0.24, 18, 18),
-      new MeshBasicMaterial({
-        color: new Color('#9af7be'),
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-      }),
-    )
-    glowCore.position.y = 0.58
-    glowCore.scale.set(0.92, 1.18, 0.92)
-
-    const glowShell = new Mesh(
-      new SphereGeometry(0.32, 18, 18),
-      new MeshBasicMaterial({
-        color: new Color('#f4ffd8'),
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-      }),
-    )
-    glowShell.position.y = 0.62
-    glowShell.scale.set(1.02, 1.34, 1.02)
-
-    root.add(glowShell, glowCore)
-
-    return {
-      root,
-      glowCore,
-      glowShell,
-    }
-  }
-
-  private setLifeTreeGlowOpacity(mesh: Mesh, opacity: number) {
-    const material = mesh.material
-    if (!(material instanceof MeshBasicMaterial)) return
-    material.opacity = opacity
-    mesh.userData.baseOpacity = opacity
-  }
-
-  private updateLifeTreeFx(input: LayerUpdateInput) {
-    const mainTree = this.trees[0]
-    const treeTargetHeight = (mainTree?.userData.treeTargetHeight as number | undefined) ?? 0
-    const shouldShowLifeTreeFx =
-      input.dayCount >= STAGE_SIX_LIFE_TREE_DAY && mainTree?.visible === true && treeTargetHeight > 0
-
-    this.lifeTreeFxRoot.visible = shouldShowLifeTreeFx
-    if (!shouldShowLifeTreeFx || !mainTree) {
-      this.setLifeTreeGlowOpacity(this.lifeTreeGlowCore, 0)
-      this.setLifeTreeGlowOpacity(this.lifeTreeGlowShell, 0)
-      return
-    }
-
-    const qualityFactor = input.qualityTier === 'tier-0' ? 0.78 : 1
-    this.lifeTreeFxRoot.position.copy(mainTree.position)
-    this.lifeTreeFxRoot.quaternion.copy(mainTree.quaternion)
-    this.lifeTreeFxRoot.scale.setScalar(treeTargetHeight * mainTree.scale.x * 0.8)
-
-    this.setLifeTreeGlowOpacity(this.lifeTreeGlowCore, 0.18 * qualityFactor)
-    this.setLifeTreeGlowOpacity(this.lifeTreeGlowShell, 0.09 * qualityFactor)
   }
 
   private createGrassPatchAnchors() {
@@ -813,50 +717,10 @@ export class VegetationLayer implements LayerController {
     })
   }
 
-  private createLifeTreeHighlightMaterial(material: Material) {
-    if (material instanceof MeshStandardMaterial) {
-      const highlightedMaterial = material.clone()
-      highlightedMaterial.color.lerp(new Color('#d4ff9c'), 0.18)
-      highlightedMaterial.emissive.set(new Color('#c6ff89'))
-      highlightedMaterial.emissiveIntensity = 0.22
-      highlightedMaterial.needsUpdate = true
-      return highlightedMaterial
-    }
-    if (material instanceof MeshLambertMaterial) {
-      const highlightedMaterial = material.clone()
-      highlightedMaterial.color.lerp(new Color('#d9ffab'), 0.18)
-      highlightedMaterial.emissive.set(new Color('#b8ff84'))
-      return highlightedMaterial
-    }
-    return material
-  }
-
-  private applyLifeTreeHighlight(treeInstance: Group) {
-    treeInstance.traverse((child) => {
-      if (!(child instanceof Mesh)) return
-
-      const material = child.material
-      if (Array.isArray(material)) {
-        child.material = material.map((entry) => this.createLifeTreeHighlightMaterial(entry))
-        return
-      }
-
-      child.material = this.createLifeTreeHighlightMaterial(material)
-    })
-  }
-
   private addMatteTreeInstance(tree: Group, assetKey: string, instance: Group, targetHeight: number) {
     tree.userData.treeAssetKey = assetKey
     tree.userData.treeTargetHeight = targetHeight
     this.applyMatteTreeMaterial(instance)
-    tree.add(instance)
-  }
-
-  private addLifeTreeInstance(tree: Group, instance: Group, targetHeight: number) {
-    tree.userData.treeAssetKey = 'life-tree'
-    tree.userData.treeTargetHeight = targetHeight
-    this.applyMatteTreeMaterial(instance)
-    this.applyLifeTreeHighlight(instance)
     tree.add(instance)
   }
 
@@ -931,8 +795,9 @@ export class VegetationLayer implements LayerController {
       if (index === 0 && this.currentMainTreeVisualVariant === 'lifeTree') {
         const targetHeight =
           treeHeights.leftTall * RABBIT_NEIGHBOR_TREE_HEIGHT_MULTIPLIER * LIFE_TREE_HEIGHT_MULTIPLIER
-        this.addLifeTreeInstance(
+        this.addMatteTreeInstance(
           tree,
+          'life-tree',
           createLargestCanopyTreeInstance({
             targetHeight,
             rotationY: index * 0.9,
