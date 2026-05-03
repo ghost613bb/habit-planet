@@ -1103,7 +1103,7 @@ export class StructureLayer implements LayerController {
       { phi: 0.66, theta: 2.66, rotationY: 0.86 },
       { phi: 0.68, theta: 3.28, rotationY: 1.98 },
       { phi: -0.73, theta: 2.42, rotationY: 0.85 },
-      { phi: -0.63, theta: 1.92, rotationY: 0.08 },
+      { phi: -0.69, theta: 1.92, rotationY: 0.08 },
     ]
 
     return anchors.map((anchor) => {
