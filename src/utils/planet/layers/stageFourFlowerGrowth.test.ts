@@ -73,7 +73,7 @@ describe('第四阶段花朵累积', () => {
     })
   })
 
-  it('第 46 天起继续保留第 35 天的 14 朵花与固定位置', async () => {
+  it('第 45 天起隐藏花球，但继续保留避树后的低模小花位置', async () => {
     const parentGroup = new Group()
     const vegetationLayer = new VegetationLayer({
       parentGroup,
@@ -89,12 +89,42 @@ describe('第四阶段花朵累积', () => {
       qualityTier: 'tier-1' as const,
     })
 
-    const dayThirtyFiveFlowers = ((vegetationLayer as any).lowPolyFlowers as Group[])
-      .filter((item) => item.visible)
-      .map((item) => item.position.clone())
-    const dayThirtyFiveGrassPatchIndices = ((vegetationLayer as any).lowPolyFlowers as Group[])
-      .filter((item) => item.visible)
-      .map((item) => item.userData.grassPatchIndex as number)
+    const dayThirtyFiveFlowers = ((vegetationLayer as any).lowPolyFlowers as Group[]).filter((item) => item.visible)
+    const dayThirtyFiveFlowerPositions = dayThirtyFiveFlowers.map((item) => item.position.clone())
+
+    vegetationLayer.update({
+      dayCount: 45,
+      stageIndex: 4 as const,
+      stageProgress: 1,
+      qualityTier: 'tier-1' as const,
+    })
+
+    const visibleTreesAtDayFortyFive = ((vegetationLayer as any).trees as Group[]).filter((item) => item.visible)
+    const visibleFlowersAtDayFortyFive = ((vegetationLayer as any).lowPolyFlowers as Group[]).filter(
+      (item) => item.visible,
+    )
+    const visibleFlowerBushesAtDayFortyFive = ((vegetationLayer as any).flowerBushes as Group[]).filter(
+      (item) => item.visible,
+    )
+    const dayFortyFiveFlowerPositions = visibleFlowersAtDayFortyFive.map((item) => item.position.clone())
+    const dayFortyFiveGrassPatchIndices = visibleFlowersAtDayFortyFive.map(
+      (item) => item.userData.grassPatchIndex as number,
+    )
+
+    expect(visibleTreesAtDayFortyFive).toHaveLength(4)
+    expect(visibleFlowersAtDayFortyFive).toHaveLength(14)
+    expect(visibleFlowerBushesAtDayFortyFive).toHaveLength(0)
+    dayThirtyFiveFlowerPositions.forEach((position, index) => {
+      expect(visibleFlowersAtDayFortyFive[index]?.position.distanceTo(position) ?? 0).toBeGreaterThan(0.05)
+    })
+
+    const getMinDistanceToTrees = (position: Vector3) =>
+      Math.min(...visibleTreesAtDayFortyFive.map((tree) => tree.position.distanceTo(position)))
+    expect(
+      Math.min(...dayFortyFiveFlowerPositions.map((position) => getMinDistanceToTrees(position))),
+    ).toBeGreaterThan(
+      Math.min(...dayThirtyFiveFlowerPositions.map((position) => getMinDistanceToTrees(position))),
+    )
 
     vegetationLayer.update({
       dayCount: 46,
@@ -104,12 +134,16 @@ describe('第四阶段花朵累积', () => {
     })
 
     const visibleStageFiveFlowers = ((vegetationLayer as any).lowPolyFlowers as Group[]).filter((item) => item.visible)
+    const visibleStageFiveFlowerBushes = ((vegetationLayer as any).flowerBushes as Group[]).filter(
+      (item) => item.visible,
+    )
     expect(visibleStageFiveFlowers).toHaveLength(14)
-    dayThirtyFiveFlowers.forEach((position, index) => {
+    expect(visibleStageFiveFlowerBushes).toHaveLength(0)
+    dayFortyFiveFlowerPositions.forEach((position, index) => {
       expect(visibleStageFiveFlowers[index]?.position.distanceTo(position) ?? Number.POSITIVE_INFINITY).toBeLessThan(
         0.0001,
       )
-      expect(visibleStageFiveFlowers[index]?.userData.grassPatchIndex).toBe(dayThirtyFiveGrassPatchIndices[index])
+      expect(visibleStageFiveFlowers[index]?.userData.grassPatchIndex).toBe(dayFortyFiveGrassPatchIndices[index])
     })
     expect(visibleStageFiveFlowers.every((item) => item.position.length() > 0)).toBe(true)
   })

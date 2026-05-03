@@ -50,6 +50,7 @@ type BushAnchor = {
 }
 
 type RabbitNeighborTreeVariant = 'default' | 'largestCanopy'
+type FlowerPlacementVariant = 'base' | 'treeAvoided'
 
 const SPROUT_SCALE_BOOST = 1.55
 const BUSH_SCALE_BOOST = 1.7
@@ -75,6 +76,25 @@ const REFINED_TREE_TARGET_HEIGHTS = {
   wide: BASE_TREE_TARGET_HEIGHTS.wide * 1.08,
   farTall: BASE_TREE_TARGET_HEIGHTS.farTall * 1.08,
 }
+const FLOWER_BUSH_BASE_ANCHORS = [
+  // 这些点位避开了篝火(theta≈0.92)、草球(≈1.02/1.46/2.4/3.6/5.1)和主树(≈5.72/2.62/2.7/4.8)。
+  // 同时仍尽量落在 shelter 视角前半球，保证第 11-14 天更容易看到。
+  { phi: 0.64, theta: 0.16, scale: 0.92 },
+  { phi: 0.6, theta: 1.84, scale: 0.96 },
+  { phi: 0.58, theta: 3.18, scale: 0.94 },
+  { phi: 0.66, theta: 4.22, scale: 0.98 },
+  { phi: 0.62, theta: 5.94, scale: 0.95 },
+  { phi: 0.68, theta: 0.58, scale: 0.9 },
+] as const
+const FLOWER_BUSH_TREE_AVOIDING_ANCHORS = [
+  // 第 45 天起树模型切换后，把花丛整体挪到离四棵树更远的安全扇区。
+  { phi: 0.63, theta: 0.3, scale: 0.92 },
+  { phi: 0.576, theta: 1.409, scale: 0.96 },
+  { phi: 0.5, theta: 1.62, scale: 0.94 },
+  { phi: 0.58, theta: 4.74, scale: 0.98 },
+  { phi: 0.64, theta: 4.92, scale: 0.95 },
+  { phi: 0.63, theta: 4.735, scale: 0.9 },
+] as const
 const BUSH_BASE_ANCHORS: BushAnchor[] = [
   { phi: 0.42, theta: 1.02 },
   { phi: 0.38, theta: 1.78 },
@@ -84,7 +104,10 @@ const BUSH_BASE_ANCHORS: BushAnchor[] = [
   { phi: 0.14, theta: 3.6 },
 ]
 // 花朵继续复用草簇锚点，但优先选择远离木板路径与中轴通道的位置，避免贴近木块模型。
-const LOW_POLY_FLOWER_GRASS_PATCH_INDICES = [20, 33, 40, 47, 54, 60, 67, 73, 79, 84, 88, 91, 94, 97] as const
+const LOW_POLY_FLOWER_BASE_GRASS_PATCH_INDICES = [20, 33, 40, 47, 54, 60, 67, 73, 79, 84, 88, 91, 94, 97] as const
+const LOW_POLY_FLOWER_TREE_AVOIDING_GRASS_PATCH_INDICES = [
+  81, 93, 29, 44, 41, 76, 49, 85, 80, 31, 28, 50, 52, 92,
+] as const
 
 export class VegetationLayer implements LayerController {
   id = 'vegetation'
@@ -110,6 +133,7 @@ export class VegetationLayer implements LayerController {
   private lowPolyFlowerLoadPromise: Promise<void> | null = null
   private currentTreeModelVariant: TreeModelVariant = 'base'
   private currentRabbitNeighborTreeVariant: RabbitNeighborTreeVariant = 'default'
+  private currentFlowerPlacementVariant: FlowerPlacementVariant = 'base'
 
   constructor(options: VegetationLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -236,6 +260,7 @@ export class VegetationLayer implements LayerController {
       input.stageIndex >= 5 ? getStageFiveTreeDayTuning(input.dayCount).treeModelVariant : 'base'
     const nextRabbitNeighborTreeVariant: RabbitNeighborTreeVariant =
       input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY ? 'largestCanopy' : 'default'
+    const nextFlowerPlacementVariant = this.getFlowerPlacementVariant(input.dayCount)
     const persistedStageTwoTuning = input.stageIndex >= 3 ? getStageTwoDayTuning(10).vegetation : null
     const inheritedVegetationTuning = stageTwoTuning ?? persistedStageTwoTuning
 
@@ -251,6 +276,11 @@ export class VegetationLayer implements LayerController {
     if (shouldReattachTrees) {
       // 第 45 天起替换兔子旁边那棵树，第 54 天起继续叠加树模型统一升级，两个切换点都要重挂树实例。
       this.attachTreeInstances()
+    }
+    if (nextFlowerPlacementVariant !== this.currentFlowerPlacementVariant) {
+      this.currentFlowerPlacementVariant = nextFlowerPlacementVariant
+      this.updateFlowerBushPlacements()
+      this.updateLowPolyFlowerPlacements()
     }
 
     this.sprout.visible = input.stageIndex === 1
@@ -279,7 +309,8 @@ export class VegetationLayer implements LayerController {
           : stageThreeTuning != null
             ? 3
             : inheritedVegetationTuning?.treeCount ?? 0
-    const visibleFlowerBushCount = stageThreeTuning?.flowerBushCount ?? 0
+    const visibleFlowerBushCount =
+      input.dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY ? 0 : (stageThreeTuning?.flowerBushCount ?? 0)
     const visibleLowPolyFlowerCount =
       input.stageIndex >= 4 && input.dayCount >= 29
         ? getStageFourFlowerDayTuning(input.dayCount).lowPolyFlowerCount
@@ -511,28 +542,9 @@ export class VegetationLayer implements LayerController {
   }
 
   private createFlowerBushAnchors() {
-    const anchors = [
-      // 这些点位避开了篝火(theta≈0.92)、草球(≈1.02/1.46/2.4/3.6/5.1)和主树(≈5.72/2.62/2.7/4.8)。
-      // 同时仍尽量落在 shelter 视角前半球，保证第 11-14 天更容易看到。
-      { phi: 0.64, theta: 0.16, scale: 0.92 },
-      { phi: 0.6, theta: 1.84, scale: 0.96 },
-      { phi: 0.58, theta: 3.18, scale: 0.94 },
-      { phi: 0.66, theta: 4.22, scale: 0.98 },
-      { phi: 0.62, theta: 5.94, scale: 0.95 },
-      { phi: 0.68, theta: 0.58, scale: 0.9 },
-    ]
-
-    return anchors.map((anchor) => {
+    return FLOWER_BUSH_BASE_ANCHORS.map((anchor) => {
       const flowerBush = new Group()
-      const { pos, quaternion } = getPlacementTransform(
-        new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
-        this.planetRadius,
-        'bush',
-      )
-
-      flowerBush.position.copy(pos)
-      flowerBush.quaternion.copy(quaternion)
-      flowerBush.scale.setScalar(anchor.scale * FLOWER_BUSH_MODEL_SCALE_FACTOR)
+      this.applyFlowerBushPlacement(flowerBush, anchor)
       flowerBush.visible = false
 
       return flowerBush
@@ -540,24 +552,78 @@ export class VegetationLayer implements LayerController {
   }
 
   private createLowPolyFlowerAnchors() {
-    return LOW_POLY_FLOWER_GRASS_PATCH_INDICES.map((grassPatchIndex) => {
-      const grassPatch = this.grassPatches[grassPatchIndex]
+    return LOW_POLY_FLOWER_BASE_GRASS_PATCH_INDICES.map((_, index) => {
       const flower = new Group()
-      const pathAnchorNormal =
-        (grassPatch?.userData.pathAnchorNormal as Vector3 | undefined)?.clone() ?? new Vector3(0, 1, 0)
-      const { pos, quaternion } = getSurfaceTransformWithClearance(
-        pathAnchorNormal,
-        this.planetRadius,
-        LOW_POLY_FLOWER_SURFACE_CLEARANCE,
-      )
-
-      flower.position.copy(pos)
-      flower.quaternion.copy(quaternion)
-      flower.userData.grassPatchIndex = grassPatchIndex
-      flower.userData.pathAnchorNormal = pathAnchorNormal
+      this.applyLowPolyFlowerPlacement(flower, index)
       flower.visible = false
 
       return flower
+    })
+  }
+
+  private getFlowerPlacementVariant(dayCount: number): FlowerPlacementVariant {
+    return dayCount >= RABBIT_NEIGHBOR_TREE_REPLACEMENT_DAY ? 'treeAvoided' : 'base'
+  }
+
+  private getActiveFlowerBushAnchors() {
+    return this.currentFlowerPlacementVariant === 'treeAvoided'
+      ? FLOWER_BUSH_TREE_AVOIDING_ANCHORS
+      : FLOWER_BUSH_BASE_ANCHORS
+  }
+
+  private getActiveLowPolyFlowerGrassPatchIndices() {
+    return this.currentFlowerPlacementVariant === 'treeAvoided'
+      ? LOW_POLY_FLOWER_TREE_AVOIDING_GRASS_PATCH_INDICES
+      : LOW_POLY_FLOWER_BASE_GRASS_PATCH_INDICES
+  }
+
+  private applyFlowerBushPlacement(
+    flowerBush: Group,
+    anchor: { phi: number; theta: number; scale: number },
+  ) {
+    const { pos, quaternion } = getPlacementTransform(
+      new Vector3().setFromSphericalCoords(1, anchor.phi, anchor.theta),
+      this.planetRadius,
+      'bush',
+    )
+
+    flowerBush.position.copy(pos)
+    flowerBush.quaternion.copy(quaternion)
+    flowerBush.scale.setScalar(anchor.scale * FLOWER_BUSH_MODEL_SCALE_FACTOR)
+  }
+
+  private updateFlowerBushPlacements() {
+    const anchors = this.getActiveFlowerBushAnchors()
+    this.flowerBushes.forEach((flowerBush, index) => {
+      const anchor = anchors[index]
+      if (!anchor) return
+      this.applyFlowerBushPlacement(flowerBush, anchor)
+    })
+  }
+
+  private applyLowPolyFlowerPlacement(flower: Group, index: number) {
+    const grassPatchIndex =
+      this.getActiveLowPolyFlowerGrassPatchIndices()[index] ??
+      LOW_POLY_FLOWER_BASE_GRASS_PATCH_INDICES[index] ??
+      0
+    const grassPatch = this.grassPatches[grassPatchIndex]
+    const pathAnchorNormal =
+      (grassPatch?.userData.pathAnchorNormal as Vector3 | undefined)?.clone() ?? new Vector3(0, 1, 0)
+    const { pos, quaternion } = getSurfaceTransformWithClearance(
+      pathAnchorNormal,
+      this.planetRadius,
+      LOW_POLY_FLOWER_SURFACE_CLEARANCE,
+    )
+
+    flower.position.copy(pos)
+    flower.quaternion.copy(quaternion)
+    flower.userData.grassPatchIndex = grassPatchIndex
+    flower.userData.pathAnchorNormal = pathAnchorNormal
+  }
+
+  private updateLowPolyFlowerPlacements() {
+    this.lowPolyFlowers.forEach((flower, index) => {
+      this.applyLowPolyFlowerPlacement(flower, index)
     })
   }
 
