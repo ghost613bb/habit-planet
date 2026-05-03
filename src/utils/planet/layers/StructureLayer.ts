@@ -94,13 +94,13 @@ const RABBIT_LEFT_OFFSET = 0.52
 const RABBIT_YAW_OFFSET = -1
 const SWING_APPEAR_START_DAY = 65
 // 控制秋千模型整体大小
-const SWING_MODEL_TARGET_HEIGHT = 1.02
+const SWING_MODEL_TARGET_HEIGHT = 1.22
 // 控制秋千离地高度
 const SWING_SURFACE_CLEARANCE = 0.02
 // 控制秋千相对房屋的前后位置
-const SWING_FRONT_OFFSET = 2.46
+const SWING_FRONT_OFFSET = -0.1
 // 控制秋千相对房屋的左右位置，调大后会更靠兔子左侧
-const SWING_LEFT_OFFSET = 1.8
+const SWING_LEFT_OFFSET = 0.6
 // 控制秋千的水平朝向
 const SWING_YAW_OFFSET = -0.5
 const CABIN_SURFACE_CLEARANCE_MICRO_FACTOR = 1 / 6
@@ -600,8 +600,8 @@ export class StructureLayer implements LayerController {
     if (!this.swingLoadPromise) {
       const swingUrl =
         typeof globalThis.location?.origin === 'string' && globalThis.location.origin.length > 0
-          ? new URL('/models/farm_wood-swing/scene.gltf', globalThis.location.origin).toString()
-          : '/models/farm_wood-swing/scene.gltf'
+          ? new URL('/models/low-poly_swing/scene.gltf', globalThis.location.origin).toString()
+          : '/models/low-poly_swing/scene.gltf'
 
       this.swingLoadPromise = new Promise((resolve, reject) => {
         this.swingLoader.load(
