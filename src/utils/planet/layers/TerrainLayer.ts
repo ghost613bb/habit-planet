@@ -75,7 +75,7 @@ export class TerrainLayer implements LayerController {
       3: 0.68,
       4: 0.68,
       5: 0.68,
-      6: 1,
+      6: 0.68,
     }
 
     const nextScale = scaleByStage[input.stageIndex]

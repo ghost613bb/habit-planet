@@ -18,7 +18,7 @@ describe('第三阶段木板小路图层集成', () => {
     })
   }
 
-  it('第 22 天起持续保留第 21 天的地表尺度与木板小路，不在第 46 天额外隆起草地', () => {
+  it('第 22 天起持续保留第 21 天的地表尺度与木板小路，不在第 46 天和第 91 天额外隆起草地', () => {
     const terrainLayer = createLayer()
     const woodPlankPath = (terrainLayer as any).woodPlankPath as Group
     const woodPlanks = woodPlankPath.children as Group[]
@@ -98,6 +98,20 @@ describe('第三阶段木板小路图层集成', () => {
       dayCount: 46,
       stageIndex: 5 as const,
       stageProgress: 0,
+      qualityTier: 'tier-1' as const,
+    })
+    expect(getGrassScale()).toBe(0.68)
+    expect(getVisibleWoodPlankNames()).toEqual([
+      'wood-plank-1',
+      'wood-plank-2',
+      'wood-plank-3',
+      'wood-plank-4',
+    ])
+
+    terrainLayer.update({
+      dayCount: 91,
+      stageIndex: 6 as const,
+      stageProgress: 1,
       qualityTier: 'tier-1' as const,
     })
     expect(getGrassScale()).toBe(0.68)
