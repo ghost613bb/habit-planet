@@ -1,7 +1,12 @@
 import {
+  AdditiveBlending,
+  BufferGeometry,
   Color,
+  Float32BufferAttribute,
   Group,
   Mesh,
+  Points,
+  PointsMaterial,
   MeshStandardMaterial,
   PointLight,
   RingGeometry,
@@ -58,6 +63,38 @@ const ENERGY_RING_UPPER_TILT_X = ENERGY_RING_TILT_X
 const ENERGY_RING_UPPER_TILT_Z = ENERGY_RING_TILT_Z
 // 控制上层副光圈整体上移高度
 const ENERGY_RING_UPPER_VERTICAL_OFFSET = 1.06
+const AMBIENT_AURA_START_DAY = 75
+const AMBIENT_AURA_SECOND_STEP_DAY = 79
+const AMBIENT_AURA_THIRD_STEP_DAY = 83
+const AMBIENT_AURA_FINAL_STEP_DAY = 87
+const AMBIENT_AURA_FULL_DAY = 90
+const AMBIENT_INNER_RING_INNER_RADIUS = 4.05
+const AMBIENT_INNER_RING_OUTER_RADIUS = 4.12
+const AMBIENT_OUTER_RING_INNER_RADIUS = 4.28
+const AMBIENT_OUTER_RING_OUTER_RADIUS = 4.38
+const AMBIENT_RING_TILT_X = Math.PI / 2
+const AMBIENT_INNER_RING_VERTICAL_OFFSET = 0.72
+const AMBIENT_OUTER_RING_VERTICAL_OFFSET = 0.86
+const AMBIENT_SPARKLES_VERTICAL_OFFSET = 0.8
+const AMBIENT_TWINKLES_VERTICAL_OFFSET = 0.94
+const AMBIENT_MOTES_VERTICAL_OFFSET = 0.68
+const AMBIENT_INNER_RING_ROTATION_SPEED = 0.05
+const AMBIENT_OUTER_RING_ROTATION_SPEED = -0.03
+const AMBIENT_SPARKLE_ROTATION_SPEED = 0.02
+const AMBIENT_TWINKLE_ROTATION_SPEED = 0.065
+const AMBIENT_MOTE_ROTATION_SPEED = -0.018
+const AMBIENT_SPARKLES_MAX_COUNT = 48
+const AMBIENT_TWINKLES_MAX_COUNT = 76
+const AMBIENT_MOTES_MAX_COUNT = 42
+const CELEBRATION_HALO_START_DAY = 91
+const CELEBRATION_HALO_INNER_RADIUS = 4.46
+const CELEBRATION_HALO_OUTER_RADIUS = 4.58
+const CELEBRATION_HALO_SOFT_INNER_RADIUS = 4.62
+const CELEBRATION_HALO_SOFT_OUTER_RADIUS = 4.82
+const CELEBRATION_HALO_VERTICAL_OFFSET = 1.02
+const CELEBRATION_HALO_SOFT_VERTICAL_OFFSET = 1.14
+const CELEBRATION_HALO_ROTATION_SPEED = 0.08
+const CELEBRATION_HALO_SOFT_ROTATION_SPEED = -0.05
 
 type FxLayerOptions = {
   parentGroup: Group
@@ -77,6 +114,13 @@ export class FxLayer implements LayerController {
   private energyRing: Mesh
   private energyRingUpper: Mesh
   private cabinWindowGlow: Mesh
+  private ambientInnerRing: Mesh
+  private ambientOuterRing: Mesh
+  private ambientSparkles: Points
+  private ambientTwinkles: Points
+  private ambientMotes: Points
+  private celebrationHalo: Mesh
+  private celebrationHaloSoft: Mesh
 
   constructor(options: FxLayerOptions) {
     this.parentGroup = options.parentGroup
@@ -95,9 +139,36 @@ export class FxLayer implements LayerController {
       96,
     )
     this.cabinWindowGlow = this.createRingMesh(0.04, 0.1, 20)
+    this.ambientInnerRing = this.createRingMesh(
+      AMBIENT_INNER_RING_INNER_RADIUS,
+      AMBIENT_INNER_RING_OUTER_RADIUS,
+      96,
+    )
+    this.ambientOuterRing = this.createRingMesh(
+      AMBIENT_OUTER_RING_INNER_RADIUS,
+      AMBIENT_OUTER_RING_OUTER_RADIUS,
+      96,
+    )
+    this.ambientSparkles = this.createAmbientSparkles()
+    this.ambientTwinkles = this.createAmbientTwinkles()
+    this.ambientMotes = this.createAmbientMotes()
+    this.celebrationHalo = this.createRingMesh(
+      CELEBRATION_HALO_INNER_RADIUS,
+      CELEBRATION_HALO_OUTER_RADIUS,
+      128,
+    )
+    this.celebrationHaloSoft = this.createRingMesh(
+      CELEBRATION_HALO_SOFT_INNER_RADIUS,
+      CELEBRATION_HALO_SOFT_OUTER_RADIUS,
+      128,
+    )
     this.tintRing(this.energyRing, '#9fe8ff', '#55d8ff')
     this.tintRing(this.energyRingUpper, '#b8eeff', '#6ce3ff')
     this.tintRing(this.cabinWindowGlow, '#ffd38a', '#ffb14d')
+    this.tintRing(this.ambientInnerRing, '#b7f2ff', '#7be8ff')
+    this.tintRing(this.ambientOuterRing, '#ffe4b3', '#ffbe7d')
+    this.tintRing(this.celebrationHalo, '#fff7bf', '#ffe47b')
+    this.tintRing(this.celebrationHaloSoft, '#baf7ff', '#7cecff')
 
     this.setupTransforms()
     this.group.add(
@@ -108,6 +179,13 @@ export class FxLayer implements LayerController {
       this.energyRing,
       this.energyRingUpper,
       this.cabinWindowGlow,
+      this.ambientInnerRing,
+      this.ambientOuterRing,
+      this.ambientSparkles,
+      this.ambientTwinkles,
+      this.ambientMotes,
+      this.celebrationHalo,
+      this.celebrationHaloSoft,
     )
   }
 
@@ -128,6 +206,35 @@ export class FxLayer implements LayerController {
     const shouldShowCabinGlow =
       input.stageIndex >= 4 && input.dayCount >= CABIN_GLOW_START_DAY && !shouldKeepCampfireOnly
     const cabinGlowWarmth = shouldShowCabinGlow ? this.getCabinGlowWarmth(input.dayCount) : 0
+    const ambientAuraPhase = this.getAmbientAuraPhase(input.dayCount)
+    const ambientAuraProgress = this.getAmbientAuraProgress(input.dayCount)
+    const ambientQualityFactor = input.qualityTier === 'tier-0' ? 0.72 : 1
+    const ambientPulse = 0.88 + ambientAuraProgress * 0.18
+    const celebrationQualityFactor = input.qualityTier === 'tier-0' ? 0.82 : 1
+    const shouldShowCelebrationHalo = input.dayCount >= CELEBRATION_HALO_START_DAY
+    const twinkleProgress = this.getProgressBetween(input.dayCount, AMBIENT_AURA_START_DAY, AMBIENT_AURA_FULL_DAY)
+    const moteProgress = this.getProgressBetween(
+      input.dayCount,
+      AMBIENT_AURA_SECOND_STEP_DAY,
+      AMBIENT_AURA_FULL_DAY,
+    )
+    const sparkleProgress = this.getProgressBetween(
+      input.dayCount,
+      AMBIENT_AURA_THIRD_STEP_DAY,
+      AMBIENT_AURA_FULL_DAY,
+    )
+    const innerAmbientOpacity =
+      ambientAuraPhase >= 1 ? (0.08 + ambientAuraProgress * 0.26) * ambientQualityFactor * ambientPulse : 0
+    const outerAmbientOpacity =
+      ambientAuraPhase >= 2 ? (0.06 + ambientAuraProgress * 0.2) * ambientQualityFactor * ambientPulse : 0
+    const sparkleOpacity =
+      ambientAuraPhase >= 3 ? (0.14 + ambientAuraProgress * 0.28) * ambientQualityFactor : 0
+    const twinkleOpacity =
+      ambientAuraPhase >= 1 ? (0.2 + twinkleProgress * 0.34) * ambientQualityFactor : 0
+    const moteOpacity =
+      ambientAuraPhase >= 2 ? (0.09 + moteProgress * 0.22) * ambientQualityFactor : 0
+    const celebrationHaloOpacity = shouldShowCelebrationHalo ? 0.62 * celebrationQualityFactor : 0
+    const celebrationHaloSoftOpacity = shouldShowCelebrationHalo ? 0.34 * celebrationQualityFactor : 0
 
     this.campfireLight.visible = input.stageIndex >= 2
     this.campfireLight.intensity = input.stageIndex >= 2 ? 0.9 + input.stageProgress * 0.9 : 0
@@ -142,6 +249,45 @@ export class FxLayer implements LayerController {
     this.setRingOpacity(
       this.cabinWindowGlow,
       shouldShowCabinGlow ? 0.03 + cabinGlowWarmth * 0.42 : 0,
+    )
+
+    this.ambientInnerRing.visible = ambientAuraPhase >= 1
+    this.ambientOuterRing.visible = ambientAuraPhase >= 2
+    this.ambientSparkles.visible = ambientAuraPhase >= 3
+    this.ambientTwinkles.visible = ambientAuraPhase >= 1
+    this.ambientMotes.visible = ambientAuraPhase >= 2
+    this.setRingOpacity(this.ambientInnerRing, innerAmbientOpacity)
+    this.setRingOpacity(this.ambientOuterRing, outerAmbientOpacity)
+    this.setPointsOpacity(this.ambientSparkles, sparkleOpacity)
+    this.setPointsOpacity(this.ambientTwinkles, twinkleOpacity)
+    this.setPointsOpacity(this.ambientMotes, moteOpacity)
+    this.celebrationHalo.visible = shouldShowCelebrationHalo
+    this.celebrationHaloSoft.visible = shouldShowCelebrationHalo
+    this.setRingOpacity(this.celebrationHalo, celebrationHaloOpacity)
+    this.setRingOpacity(this.celebrationHaloSoft, celebrationHaloSoftOpacity)
+    this.setPointsDrawCount(
+      this.ambientSparkles,
+      this.getAmbientParticleDrawCount(
+        AMBIENT_SPARKLES_MAX_COUNT,
+        ambientAuraPhase >= 3 ? 0.52 + sparkleProgress * 0.48 : 0,
+        input.qualityTier,
+      ),
+    )
+    this.setPointsDrawCount(
+      this.ambientTwinkles,
+      this.getAmbientParticleDrawCount(
+        AMBIENT_TWINKLES_MAX_COUNT,
+        ambientAuraPhase >= 1 ? 0.58 + twinkleProgress * 0.42 : 0,
+        input.qualityTier,
+      ),
+    )
+    this.setPointsDrawCount(
+      this.ambientMotes,
+      this.getAmbientParticleDrawCount(
+        AMBIENT_MOTES_MAX_COUNT,
+        ambientAuraPhase >= 2 ? 0.5 + moteProgress * 0.5 : 0,
+        input.qualityTier,
+      ),
     )
 
     this.energyRing.visible = shouldShowEnergyRing
@@ -179,6 +325,13 @@ export class FxLayer implements LayerController {
     this.energyRing.rotation.z = ENERGY_RING_TILT_Z + input.dayCount * ENERGY_RING_ROTATION_SPEED
     this.energyRingUpper.rotation.z =
       ENERGY_RING_UPPER_TILT_Z + input.dayCount * ENERGY_RING_ROTATION_SPEED
+    this.ambientInnerRing.rotation.z = input.dayCount * AMBIENT_INNER_RING_ROTATION_SPEED
+    this.ambientOuterRing.rotation.z = input.dayCount * AMBIENT_OUTER_RING_ROTATION_SPEED
+    this.ambientSparkles.rotation.z = input.dayCount * AMBIENT_SPARKLE_ROTATION_SPEED
+    this.ambientTwinkles.rotation.z = input.dayCount * AMBIENT_TWINKLE_ROTATION_SPEED
+    this.ambientMotes.rotation.z = input.dayCount * AMBIENT_MOTE_ROTATION_SPEED
+    this.celebrationHalo.rotation.z = input.dayCount * CELEBRATION_HALO_ROTATION_SPEED
+    this.celebrationHaloSoft.rotation.z = input.dayCount * CELEBRATION_HALO_SOFT_ROTATION_SPEED
   }
 
   deactivate() {
@@ -187,6 +340,9 @@ export class FxLayer implements LayerController {
 
   dispose() {
     this.parentGroup.remove(this.group)
+    this.ambientSparkles.geometry.dispose()
+    this.ambientTwinkles.geometry.dispose()
+    this.ambientMotes.geometry.dispose()
   }
 
   private createRingMesh(innerRadius: number, outerRadius: number, segments: number) {
@@ -208,6 +364,16 @@ export class FxLayer implements LayerController {
     material.opacity = opacity
   }
 
+  private setPointsOpacity(points: Points, opacity: number) {
+    const material = points.material
+    if (!(material instanceof PointsMaterial)) return
+    material.opacity = opacity
+  }
+
+  private setPointsDrawCount(points: Points, count: number) {
+    points.geometry.setDrawRange(0, count)
+  }
+
   private getCabinGlowWarmth(dayCount: number) {
     if (dayCount <= CABIN_GLOW_STABLE_DAY) {
       return getStageFourCabinDayTuning(dayCount).windowWarmth
@@ -217,6 +383,39 @@ export class FxLayer implements LayerController {
 
   private shouldShowEnergyRing(dayCount: number) {
     return dayCount >= ENERGY_RING_START_DAY
+  }
+
+  private getAmbientAuraPhase(dayCount: number) {
+    if (dayCount < AMBIENT_AURA_START_DAY) return 0
+    if (dayCount < AMBIENT_AURA_SECOND_STEP_DAY) return 1
+    if (dayCount < AMBIENT_AURA_THIRD_STEP_DAY) return 2
+    if (dayCount < AMBIENT_AURA_FINAL_STEP_DAY) return 3
+    return 4
+  }
+
+  private getAmbientAuraProgress(dayCount: number) {
+    if (dayCount <= AMBIENT_AURA_START_DAY) return 0
+    if (dayCount >= AMBIENT_AURA_FULL_DAY) return 1
+    return (
+      (Math.min(dayCount, AMBIENT_AURA_FULL_DAY) - AMBIENT_AURA_START_DAY) /
+      Math.max(1, AMBIENT_AURA_FULL_DAY - AMBIENT_AURA_START_DAY)
+    )
+  }
+
+  private getProgressBetween(dayCount: number, startDay: number, endDay: number) {
+    if (dayCount <= startDay) return 0
+    if (dayCount >= endDay) return 1
+    return (dayCount - startDay) / Math.max(1, endDay - startDay)
+  }
+
+  private getAmbientParticleDrawCount(
+    maxCount: number,
+    revealProgress: number,
+    qualityTier: LayerUpdateInput['qualityTier'],
+  ) {
+    if (revealProgress <= 0) return 0
+    const qualityFactor = qualityTier === 'tier-0' ? 0.55 : 1
+    return Math.max(1, Math.round(maxCount * qualityFactor * revealProgress))
   }
 
   private getEnergyRingOpacity(dayCount: number, qualityTier: LayerUpdateInput['qualityTier']) {
@@ -299,6 +498,20 @@ export class FxLayer implements LayerController {
     this.energyRingUpper.position.set(0, ENERGY_RING_UPPER_VERTICAL_OFFSET, 0)
     this.energyRingUpper.rotation.x = ENERGY_RING_UPPER_TILT_X
     this.energyRingUpper.rotation.z = ENERGY_RING_UPPER_TILT_Z
+    this.ambientInnerRing.position.set(0, AMBIENT_INNER_RING_VERTICAL_OFFSET, 0)
+    this.ambientInnerRing.rotation.x = AMBIENT_RING_TILT_X
+    this.ambientOuterRing.position.set(0, AMBIENT_OUTER_RING_VERTICAL_OFFSET, 0)
+    this.ambientOuterRing.rotation.x = AMBIENT_RING_TILT_X
+    this.ambientSparkles.position.set(0, AMBIENT_SPARKLES_VERTICAL_OFFSET, 0)
+    this.ambientSparkles.rotation.x = AMBIENT_RING_TILT_X
+    this.ambientTwinkles.position.set(0, AMBIENT_TWINKLES_VERTICAL_OFFSET, 0)
+    this.ambientTwinkles.rotation.x = AMBIENT_RING_TILT_X
+    this.ambientMotes.position.set(0, AMBIENT_MOTES_VERTICAL_OFFSET, 0)
+    this.ambientMotes.rotation.x = AMBIENT_RING_TILT_X
+    this.celebrationHalo.position.set(0, CELEBRATION_HALO_VERTICAL_OFFSET, 0)
+    this.celebrationHalo.rotation.x = AMBIENT_RING_TILT_X
+    this.celebrationHaloSoft.position.set(0, CELEBRATION_HALO_SOFT_VERTICAL_OFFSET, 0)
+    this.celebrationHaloSoft.rotation.x = AMBIENT_RING_TILT_X
     this.syncCabinWindowGlowTransform(CABIN_GLOW_START_DAY)
 
     this.campfireLight.visible = false
@@ -308,5 +521,79 @@ export class FxLayer implements LayerController {
     this.energyRing.visible = false
     this.energyRingUpper.visible = false
     this.cabinWindowGlow.visible = false
+    this.ambientInnerRing.visible = false
+    this.ambientOuterRing.visible = false
+    this.ambientSparkles.visible = false
+    this.ambientTwinkles.visible = false
+    this.ambientMotes.visible = false
+    this.celebrationHalo.visible = false
+    this.celebrationHaloSoft.visible = false
+  }
+
+  private createAmbientSparkles() {
+    return this.createPointCloud({
+      count: AMBIENT_SPARKLES_MAX_COUNT,
+      baseRadius: 4.2,
+      radiusStep: 0.08,
+      verticalStep: 0.018,
+      color: 0xc6fbff,
+      size: 0.075,
+    })
+  }
+
+  private createAmbientTwinkles() {
+    return this.createPointCloud({
+      count: AMBIENT_TWINKLES_MAX_COUNT,
+      baseRadius: 4.34,
+      radiusStep: 0.06,
+      verticalStep: 0.012,
+      color: 0xfffde8,
+      size: 0.05,
+    })
+  }
+
+  private createAmbientMotes() {
+    return this.createPointCloud({
+      count: AMBIENT_MOTES_MAX_COUNT,
+      baseRadius: 4.08,
+      radiusStep: 0.11,
+      verticalStep: 0.026,
+      color: 0xc8f6ff,
+      size: 0.1,
+    })
+  }
+
+  private createPointCloud(options: {
+    count: number
+    baseRadius: number
+    radiusStep: number
+    verticalStep: number
+    color: number
+    size: number
+  }) {
+    const geometry = new BufferGeometry()
+    const positions: number[] = []
+
+    for (let i = 0; i < options.count; i += 1) {
+      const angle = (Math.PI * 2 * i) / options.count
+      const radius = options.baseRadius + (i % 4) * options.radiusStep
+      const verticalOffset = ((i % 7) - 3) * options.verticalStep
+      positions.push(Math.cos(angle) * radius, verticalOffset, Math.sin(angle) * radius)
+    }
+
+    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
+    geometry.setDrawRange(0, 0)
+
+    return new Points(
+      geometry,
+      new PointsMaterial({
+        color: options.color,
+        size: options.size,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      }),
+    )
   }
 }

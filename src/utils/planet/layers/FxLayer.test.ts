@@ -1,4 +1,4 @@
-import { Group, Mesh, MeshStandardMaterial, PointLight } from 'three'
+import { Group, Mesh, MeshStandardMaterial, PointLight, Points, PointsMaterial } from 'three'
 import { describe, expect, it } from 'vitest'
 
 import { buildStageSnapshot } from '../runtime/stageRuntime'
@@ -32,6 +32,16 @@ function getOuterRadius(mesh: Mesh) {
     parameters?: { outerRadius?: number }
   }
   return geometry.parameters?.outerRadius ?? 0
+}
+
+function getPointsOpacity(points: Points) {
+  const material = points.material
+  if (!(material instanceof PointsMaterial)) return 0
+  return material.opacity
+}
+
+function getDrawCount(points: Points) {
+  return points.geometry.drawRange.count
 }
 
 describe('FxLayer', () => {
@@ -148,6 +158,145 @@ describe('FxLayer', () => {
     expect(day60Position.distanceTo(day59Position)).toBeGreaterThan(0.05)
     expect(day59Opacity).toBeGreaterThan(0)
     expect(day60Opacity).toBeGreaterThan(0)
+  })
+
+  it('第 75-90 天会按节点逐步叠加氛围光效', () => {
+    const layer = createLayer()
+    const ambientInnerRing = (layer as any).ambientInnerRing as Mesh
+    const ambientOuterRing = (layer as any).ambientOuterRing as Mesh
+    const ambientSparkles = (layer as any).ambientSparkles as Points
+    const ambientTwinkles = (layer as any).ambientTwinkles as Points
+    const ambientMotes = (layer as any).ambientMotes as Points
+    const energyRing = (layer as any).energyRing as Mesh
+    const cabinWindowGlow = (layer as any).cabinWindowGlow as Mesh
+
+    updateLayer(layer, 74)
+    expect(ambientInnerRing.visible).toBe(false)
+    expect(ambientOuterRing.visible).toBe(false)
+    expect(ambientSparkles.visible).toBe(false)
+    expect(ambientTwinkles.visible).toBe(false)
+    expect(ambientMotes.visible).toBe(false)
+
+    updateLayer(layer, 75)
+    const day75InnerOpacity = getOpacity(ambientInnerRing)
+    const day75TwinkleOpacity = getPointsOpacity(ambientTwinkles)
+    const day75TwinkleCount = getDrawCount(ambientTwinkles)
+    expect(ambientInnerRing.visible).toBe(true)
+    expect(ambientOuterRing.visible).toBe(false)
+    expect(ambientSparkles.visible).toBe(false)
+    expect(ambientTwinkles.visible).toBe(true)
+    expect(ambientMotes.visible).toBe(false)
+    expect(day75InnerOpacity).toBeGreaterThan(0)
+    expect(day75TwinkleOpacity).toBeGreaterThan(0)
+    expect(day75TwinkleCount).toBeGreaterThan(0)
+    expect(energyRing.visible).toBe(true)
+    expect(cabinWindowGlow.visible).toBe(true)
+
+    updateLayer(layer, 79)
+    const day79InnerOpacity = getOpacity(ambientInnerRing)
+    const day79OuterOpacity = getOpacity(ambientOuterRing)
+    const day79TwinkleOpacity = getPointsOpacity(ambientTwinkles)
+    const day79TwinkleCount = getDrawCount(ambientTwinkles)
+    const day79MoteOpacity = getPointsOpacity(ambientMotes)
+    const day79MoteCount = getDrawCount(ambientMotes)
+    expect(day79InnerOpacity).toBeGreaterThan(day75InnerOpacity)
+    expect(ambientOuterRing.visible).toBe(true)
+    expect(day79OuterOpacity).toBeGreaterThan(0)
+    expect(ambientSparkles.visible).toBe(false)
+    expect(day79TwinkleOpacity).toBeGreaterThan(day75TwinkleOpacity)
+    expect(day79TwinkleCount).toBeGreaterThan(day75TwinkleCount)
+    expect(ambientMotes.visible).toBe(true)
+    expect(day79MoteOpacity).toBeGreaterThan(0)
+    expect(day79MoteCount).toBeGreaterThan(0)
+
+    updateLayer(layer, 83)
+    const day83SparklesOpacity = getPointsOpacity(ambientSparkles)
+    const day83SparklesCount = getDrawCount(ambientSparkles)
+    expect(ambientSparkles.visible).toBe(true)
+    expect(day83SparklesOpacity).toBeGreaterThan(0)
+    expect(day83SparklesCount).toBeGreaterThan(0)
+
+    updateLayer(layer, 87)
+    const day87InnerOpacity = getOpacity(ambientInnerRing)
+    const day87OuterOpacity = getOpacity(ambientOuterRing)
+    const day87SparklesOpacity = getPointsOpacity(ambientSparkles)
+    const day87TwinkleOpacity = getPointsOpacity(ambientTwinkles)
+    const day87MoteOpacity = getPointsOpacity(ambientMotes)
+    const day87SparklesCount = getDrawCount(ambientSparkles)
+
+    updateLayer(layer, 90)
+    const day90InnerOpacity = getOpacity(ambientInnerRing)
+    const day90OuterOpacity = getOpacity(ambientOuterRing)
+    const day90SparklesOpacity = getPointsOpacity(ambientSparkles)
+    const day90SparklesCount = getDrawCount(ambientSparkles)
+    const day90TwinkleOpacity = getPointsOpacity(ambientTwinkles)
+    const day90TwinkleCount = getDrawCount(ambientTwinkles)
+    const day90MoteOpacity = getPointsOpacity(ambientMotes)
+    const day90MoteCount = getDrawCount(ambientMotes)
+
+    expect(day90InnerOpacity).toBeGreaterThan(day87InnerOpacity)
+    expect(day90OuterOpacity).toBeGreaterThan(day87OuterOpacity)
+    expect(day90SparklesOpacity).toBeGreaterThan(day87SparklesOpacity)
+    expect(day90TwinkleOpacity).toBeGreaterThan(day87TwinkleOpacity)
+    expect(day90MoteOpacity).toBeGreaterThan(day87MoteOpacity)
+    expect(day90SparklesCount).toBeGreaterThan(day87SparklesCount)
+    expect(day90SparklesOpacity).toBeGreaterThan(0.4)
+    expect(day90SparklesCount).toBeGreaterThan(45)
+    expect(day90TwinkleOpacity).toBeGreaterThan(0.5)
+    expect(day90TwinkleCount).toBeGreaterThan(70)
+    expect(day90MoteOpacity).toBeGreaterThan(0.3)
+    expect(day90MoteCount).toBeGreaterThan(40)
+  })
+
+  it('第 91 天会瞬时点亮完整祝贺光环', () => {
+    const layer = createLayer()
+    const celebrationHalo = (layer as any).celebrationHalo as Mesh
+    const celebrationHaloSoft = (layer as any).celebrationHaloSoft as Mesh
+
+    updateLayer(layer, 90)
+    expect(celebrationHalo.visible).toBe(false)
+    expect(celebrationHaloSoft.visible).toBe(false)
+    expect(getOpacity(celebrationHalo)).toBe(0)
+    expect(getOpacity(celebrationHaloSoft)).toBe(0)
+
+    updateLayer(layer, 91)
+    const haloOpacity = getOpacity(celebrationHalo)
+    const haloSoftOpacity = getOpacity(celebrationHaloSoft)
+    expect(celebrationHalo.visible).toBe(true)
+    expect(celebrationHaloSoft.visible).toBe(true)
+    expect(haloOpacity).toBeGreaterThan(0.55)
+    expect(haloSoftOpacity).toBeGreaterThan(0.28)
+    expect(celebrationHalo.position.y).toBeGreaterThan(0.9)
+    expect(celebrationHaloSoft.position.y).toBeGreaterThan(celebrationHalo.position.y)
+  })
+
+  it('低画质下会降低细闪和光粒的数量与透明度', () => {
+    const layer = createLayer()
+    const ambientTwinkles = (layer as any).ambientTwinkles as Points
+    const ambientMotes = (layer as any).ambientMotes as Points
+
+    layer.update({
+      ...buildStageSnapshot(90),
+      qualityTier: 'tier-0',
+    })
+    const tier0TwinkleOpacity = getPointsOpacity(ambientTwinkles)
+    const tier0TwinkleCount = getDrawCount(ambientTwinkles)
+    const tier0MoteOpacity = getPointsOpacity(ambientMotes)
+    const tier0MoteCount = getDrawCount(ambientMotes)
+
+    layer.update({
+      ...buildStageSnapshot(90),
+      qualityTier: 'tier-1',
+    })
+    const tier1TwinkleOpacity = getPointsOpacity(ambientTwinkles)
+    const tier1TwinkleCount = getDrawCount(ambientTwinkles)
+    const tier1MoteOpacity = getPointsOpacity(ambientMotes)
+    const tier1MoteCount = getDrawCount(ambientMotes)
+
+    expect(tier0TwinkleOpacity).toBeLessThan(tier1TwinkleOpacity)
+    expect(tier0TwinkleCount).toBeLessThan(tier1TwinkleCount)
+    expect(tier0MoteOpacity).toBeLessThan(tier1MoteOpacity)
+    expect(tier0MoteCount).toBeLessThan(tier1MoteCount)
   })
 
   it('第 21 天仍处于无窗光无光环的前一阶段', () => {
