@@ -450,7 +450,7 @@ export class VegetationLayer implements LayerController {
   private createTrees() {
     const anchors = [
       // 帐篷左侧直杆树（勿删）
-      { phi: 0.48, theta: 5.72 },
+      { phi: 0.54, theta: 5.22 },
       // 帐篷右侧靠内松树（勿删）
       { phi: 0.4, theta: 3.7 },
       // 帐篷右侧靠外松树（勿删）
